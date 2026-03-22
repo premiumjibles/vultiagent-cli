@@ -1,9 +1,9 @@
 import { SUPPORTED_CHAINS } from '@vultisig/sdk'
-import type { Chain } from '@vultisig/sdk'
 import { createSdkWithVault } from '../lib/sdk.js'
 import { loadConfig, saveConfig } from '../auth/config.js'
 import { printResult } from '../lib/output.js'
-import { UsageError } from '../lib/errors.js'
+import { InvalidChainError } from '../lib/errors.js'
+import { resolveChain } from '../lib/validation.js'
 import type { OutputFormat } from '../lib/output.js'
 
 interface ChainsOpts {
@@ -48,21 +48,19 @@ export async function manageChainsCommand(opts: ChainsOpts, format: OutputFormat
     }
 
     if (opts.add) {
-      const chain = opts.add as Chain
-      if (!SUPPORTED_CHAINS.includes(chain)) {
-        throw new UsageError(
-          `Unknown chain: ${opts.add}`,
-          `Supported chains: ${SUPPORTED_CHAINS.join(', ')}`
-        )
+      const chain = resolveChain(opts.add)
+      const alreadyActive = vault.chains.includes(chain)
+      if (alreadyActive) {
+        const address = await vault.address(chain)
+        printResult({ action: 'already-active', chain, address }, format)
+        return
       }
-      if (!vault.chains.includes(chain)) {
-        await vault.addChain(chain)
-      }
+      await vault.addChain(chain)
       const address = await vault.address(chain)
 
       // Persist to config
-      if (!currentExtras.includes(opts.add)) {
-        await persistExtraChains(vaultEntry.id, [...currentExtras, opts.add])
+      if (!currentExtras.includes(String(chain))) {
+        await persistExtraChains(vaultEntry.id, [...currentExtras, String(chain)])
       }
 
       printResult({ action: 'added', chain, address }, format)
@@ -70,13 +68,19 @@ export async function manageChainsCommand(opts: ChainsOpts, format: OutputFormat
     }
 
     if (opts.remove) {
-      const chain = opts.remove as Chain
+      const chain = resolveChain(opts.remove)
+      if (!vault.chains.includes(chain)) {
+        throw new InvalidChainError(
+          `Chain ${chain} is not active on this vault`,
+          `Run "vasig chains" to see active chains`
+        )
+      }
       await vault.removeChain(chain)
 
       // Remove from persisted extras
       await persistExtraChains(
         vaultEntry.id,
-        currentExtras.filter((c) => c !== opts.remove)
+        currentExtras.filter((c) => c !== String(chain))
       )
 
       printResult({ action: 'removed', chain, remaining: [...vault.chains] }, format)

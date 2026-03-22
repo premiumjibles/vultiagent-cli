@@ -2,6 +2,7 @@ import { Vultisig } from '@vultisig/sdk'
 import { createSdkWithVault } from '../lib/sdk.js'
 import { printResult } from '../lib/output.js'
 import { NetworkError, UsageError, InsufficientBalanceError, classifyError, VasigError } from '../lib/errors.js'
+import { resolveChain, parseAmount, isEvmChain } from '../lib/validation.js'
 import { signWithRetry } from '../lib/signing.js'
 import type { OutputFormat } from '../lib/output.js'
 import type { SendResult } from '../types.js'
@@ -16,14 +17,27 @@ interface SendOpts {
 }
 
 export async function executeSend(opts: SendOpts): Promise<SendResult> {
+  const chain = resolveChain(opts.chain)
+
+  if (opts.amount !== 'max') {
+    parseAmount(opts.amount)
+  }
+
+  if (opts.memo && isEvmChain(chain)) {
+    throw new UsageError(
+      'Memos are not supported on EVM chains',
+      'EVM transactions use the data field for contract calls. Remove the --memo flag.'
+    )
+  }
+
   const { sdk, vault } = await createSdkWithVault()
 
   try {
-    const address = await vault.address(opts.chain)
-    const balance = await vault.balance(opts.chain, opts.token)
+    const address = await vault.address(chain)
+    const balance = await vault.balance(chain, opts.token)
 
     const coin = {
-      chain: opts.chain,
+      chain: chain,
       address,
       decimals: balance.decimals,
       ticker: balance.symbol,
@@ -70,21 +84,21 @@ export async function executeSend(opts: SendOpts): Promise<SendResult> {
 
     const messageHashes = await vault.extractMessageHashes(payload)
     const signature = await signWithRetry(() =>
-      vault.sign({ transaction: payload, chain: opts.chain, messageHashes }),
+      vault.sign({ transaction: payload, chain: chain, messageHashes }),
     )
     const txHash = await vault.broadcastTx({
-      chain: opts.chain,
+      chain: chain,
       keysignPayload: payload,
       signature,
     })
 
-    const explorerUrl = Vultisig.getTxExplorerUrl(opts.chain, txHash)
+    const explorerUrl = Vultisig.getTxExplorerUrl(chain, txHash)
 
     const displayAmount = opts.amount === 'max'
       ? (balance.formattedAmount ?? balance.amount)
       : opts.amount
 
-    return { txHash, chain: opts.chain, explorerUrl, amount: displayAmount, to: opts.to, symbol: balance.symbol }
+    return { txHash, chain: chain, explorerUrl, amount: displayAmount, to: opts.to, symbol: balance.symbol }
   } catch (err: unknown) {
     if (err instanceof VasigError) throw err
     if (err instanceof Error && (err.message.includes('network') || err.message.includes('timeout'))) {

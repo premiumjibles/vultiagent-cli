@@ -37,6 +37,7 @@ vi.mock('../../src/lib/sdk.js', () => ({
 
 vi.mock('@vultisig/sdk', () => ({
   Vultisig: { getTxExplorerUrl: vi.fn().mockReturnValue('https://etherscan.io/tx/0xswaptx') },
+  SUPPORTED_CHAINS: ['Ethereum', 'Bitcoin', 'THORChain', 'Solana', 'Arbitrum', 'BSC', 'Avalanche', 'Base', 'Optimism', 'Polygon'],
 }))
 
 vi.mock('keytar', () => ({

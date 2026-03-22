@@ -1,6 +1,7 @@
 import { createSdkWithVault } from '../lib/sdk.js'
 import { printResult } from '../lib/output.js'
 import { NetworkError } from '../lib/errors.js'
+import { resolveChain } from '../lib/validation.js'
 import { toToken } from '../lib/tokens.js'
 import { persistTokens } from '../auth/config.js'
 import type { PersistedToken } from '../auth/config.js'
@@ -14,6 +15,7 @@ interface BalanceOpts {
 }
 
 export async function getBalances(opts: BalanceOpts): Promise<BalanceResult[]> {
+  const chain = opts.chain ? resolveChain(opts.chain) : undefined
   const { sdk, vault, vaultEntry } = await createSdkWithVault()
 
   try {
@@ -21,7 +23,7 @@ export async function getBalances(opts: BalanceOpts): Promise<BalanceResult[]> {
     if (opts.includeTokens) {
       const hasPersistedTokens = Object.keys(vaultEntry.tokens ?? {}).length > 0
       if (!hasPersistedTokens) {
-        const chains = opts.chain ? [opts.chain] : [...vault.chains]
+        const chains = chain ? [String(chain)] : [...vault.chains]
         for (const chain of chains) {
           try {
             const discovered = await vault.discoverTokens(chain)
@@ -46,15 +48,15 @@ export async function getBalances(opts: BalanceOpts): Promise<BalanceResult[]> {
       }
     }
 
-    const chains = opts.chain ? [opts.chain] : undefined
+    const chainStr = chain ? String(chain) : undefined
 
     if (opts.fiat) {
-      const chainsToFetch = chains ?? [...vault.chains]
+      const chainsToFetch = chainStr ? [chainStr] : [...vault.chains]
       const results: BalanceResult[] = []
 
-      for (const chain of chainsToFetch) {
+      for (const c of chainsToFetch) {
         try {
-          const balances = await vault.balancesWithPrices([chain], opts.includeTokens, 'usd')
+          const balances = await vault.balancesWithPrices([c], opts.includeTokens, 'usd')
           for (const b of Object.values(balances)) {
             const result: BalanceResult = {
               chain: b.chainId,
@@ -71,7 +73,7 @@ export async function getBalances(opts: BalanceOpts): Promise<BalanceResult[]> {
           }
         } catch {
           // Pricing failed for this chain — fall back to balances without fiat
-          const balances = await vault.balances([chain], opts.includeTokens)
+          const balances = await vault.balances([c], opts.includeTokens)
           for (const b of Object.values(balances)) {
             results.push({
               chain: b.chainId,
@@ -85,21 +87,21 @@ export async function getBalances(opts: BalanceOpts): Promise<BalanceResult[]> {
       return results
     }
 
-    if (opts.chain) {
-      const balance = await vault.balance(opts.chain, undefined)
+    if (chainStr) {
+      const balance = await vault.balance(chainStr, undefined)
       const results: BalanceResult[] = [{
-        chain: balance.chainId ?? opts.chain,
+        chain: balance.chainId ?? chainStr,
         symbol: balance.symbol,
         amount: balance.formattedAmount ?? balance.amount,
       }]
       if (opts.includeTokens) {
-        const tokens = vault.getTokens(opts.chain)
+        const tokens = vault.getTokens(chainStr)
         for (const t of tokens) {
           const tokenId = t.id ?? t.contractAddress ?? ''
           try {
-            const tb = await vault.balance(opts.chain, tokenId)
+            const tb = await vault.balance(chainStr, tokenId)
             const tokenResult: BalanceResult = {
-              chain: opts.chain,
+              chain: chainStr,
               symbol: tb.symbol ?? t.symbol,
               amount: tb.formattedAmount ?? tb.amount,
             }

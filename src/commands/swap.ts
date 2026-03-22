@@ -2,6 +2,7 @@ import { Vultisig } from '@vultisig/sdk'
 import { createSdkWithVault } from '../lib/sdk.js'
 import { printResult } from '../lib/output.js'
 import { NetworkError, UsageError, NoRouteError, classifyError, VasigError } from '../lib/errors.js'
+import { resolveChain, parseAmount } from '../lib/validation.js'
 import { signWithRetry } from '../lib/signing.js'
 import type { OutputFormat } from '../lib/output.js'
 import type { SwapQuoteResult, SwapResult } from '../types.js'
@@ -15,16 +16,15 @@ interface SwapOpts {
 
 function parseChainToken(input: string): { chain: string; token?: string } {
   const parts = input.split(':')
-  return { chain: parts[0], token: parts[1] }
+  const chain = resolveChain(parts[0])
+  return { chain, token: parts[1] }
 }
 
 function buildSwapQuoteParams(opts: SwapOpts) {
   const from = parseChainToken(opts.from)
   const to = parseChainToken(opts.to)
 
-  if (!(parseFloat(opts.amount) > 0)) {
-    throw new UsageError('Amount must be greater than 0')
-  }
+  parseAmount(opts.amount)
   if (from.chain === to.chain && from.token === to.token) {
     throw new UsageError('Cannot swap the same token')
   }
