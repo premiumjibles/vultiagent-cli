@@ -21,6 +21,14 @@ function parseChainToken(input: string): { chain: string; token?: string } {
 function buildSwapQuoteParams(opts: SwapOpts) {
   const from = parseChainToken(opts.from)
   const to = parseChainToken(opts.to)
+
+  if (!(parseFloat(opts.amount) > 0)) {
+    throw new UsageError('Amount must be greater than 0')
+  }
+  if (from.chain === to.chain && from.token === to.token) {
+    throw new UsageError('Cannot swap the same token')
+  }
+
   return {
     from,
     to,
@@ -63,7 +71,10 @@ export async function getSwapQuote(opts: SwapOpts): Promise<SwapQuoteResult> {
       result.requiresApproval = true
     }
     if (quote.warnings.length > 0) {
-      result.warnings = quote.warnings
+      result.warnings = [...quote.warnings]
+    }
+    if (!quote.estimatedOutputFiat && parseFloat(opts.amount) > 0) {
+      result.warnings = [...(result.warnings ?? []), 'Quote output is near-zero — this route may result in fund loss.']
     }
     return result
   } finally {
@@ -89,6 +100,10 @@ export async function executeSwap(opts: SwapOpts, format: OutputFormat): Promise
     const { from, to, quoteRequest } = buildSwapQuoteParams(opts)
     const quote = await vault.getSwapQuote(quoteRequest)
 
+    if (!quote.estimatedOutputFiat && parseFloat(opts.amount) > 0) {
+      throw new UsageError('Quote output is near-zero — this route would result in fund loss. Try a different route.')
+    }
+
     // Log quote summary before executing
     const summary: SwapQuoteResult = {
       fromChain: quote.fromCoin.chain,
@@ -102,7 +117,9 @@ export async function executeSwap(opts: SwapOpts, format: OutputFormat): Promise
     if (quote.estimatedOutputFiat != null) {
       summary.estimatedOutputFiat = `$${quote.estimatedOutputFiat.toFixed(2)}`
     }
-    printResult({ action: 'quote', ...summary }, format)
+    if (format !== 'json') {
+      printResult({ action: 'quote', ...summary }, format)
+    }
 
     const { keysignPayload, approvalPayload } = await vault.prepareSwapTx({
       fromCoin: { chain: from.chain, token: from.token },

@@ -9,7 +9,14 @@ export async function signWithRetry<T>(fn: () => Promise<T>): Promise<T> {
   let lastErr: unknown
   for (let attempt = 0; attempt <= MAX_SIGN_RETRIES; attempt++) {
     try {
-      return await fn()
+      // Suppress SDK console.log during signing
+      const origLog = console.log
+      console.log = () => {}
+      try {
+        return await fn()
+      } finally {
+        console.log = origLog
+      }
     } catch (err) {
       lastErr = err
       if (!isMpcTimeout(err) || attempt === MAX_SIGN_RETRIES) break
