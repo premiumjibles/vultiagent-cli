@@ -63,7 +63,7 @@ export async function authSetup(opts: AuthSetupOpts): Promise<{ vaultId: string;
           type: 'password',
           name: 'password',
           message: attempt === 1
-            ? 'Enter vault decryption password (the password you set when exporting from the Vultisig app):'
+            ? 'Enter vault file password (the password you chose when exporting/backing up from the Vultisig app — this unlocks the .vult file):'
             : `Wrong password. Try again (attempt ${attempt}/${MAX_ATTEMPTS}):`,
           mask: '*',
         },
@@ -92,7 +92,7 @@ export async function authSetup(opts: AuthSetupOpts): Promise<{ vaultId: string;
     {
       type: 'password',
       name: 'serverPassword',
-      message: 'Enter VultiServer password (for 2-of-2 signing):',
+      message: 'Enter VultiServer password (your server signing password, used for 2-of-2 MPC signing with VultiServer):',
       mask: '*',
     },
   ])
