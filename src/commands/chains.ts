@@ -35,7 +35,8 @@ export async function manageChainsCommand(opts: ChainsOpts, format: OutputFormat
       await vault.setChains([...SUPPORTED_CHAINS])
       const added = SUPPORTED_CHAINS.length - originalChains.length
       const newExtras = SUPPORTED_CHAINS.filter((c) => !originalChains.includes(c))
-      await persistExtraChains(vaultEntry.id, newExtras as string[])
+      const mergedExtras = [...new Set([...currentExtras, ...newExtras.map(String)])]
+      await persistExtraChains(vaultEntry.id, mergedExtras)
 
       printResult({
         action: 'add-all',
