@@ -44,6 +44,12 @@ export async function executeSend(opts: SendOpts): Promise<SendResult> {
       amount = BigInt(whole || '0') * 10n ** BigInt(balance.decimals) + BigInt(paddedFrac || '0')
     }
 
+    if (amount > BigInt(balance.amount)) {
+      throw new UsageError(
+        `Insufficient balance: you have ${balance.formattedAmount ?? balance.amount} ${balance.symbol}, tried to send ${opts.amount}`,
+      )
+    }
+
     const payload = await vault.prepareSendTx({
       coin,
       receiver: opts.to,
