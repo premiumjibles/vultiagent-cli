@@ -19,22 +19,27 @@ export async function createSdkWithVault(vaultId?: string) {
     throw new AuthRequiredError(`Vault ${vaultId} not found. Run vasig auth to set up credentials.`)
   }
 
-  const sdk = new Vultisig({
-    onPasswordRequired: async (id: string) => {
-      // Try decryption password first (primary use: encrypted vault files)
-      // Fall back to server password (fast vaults where server pw = vault pw)
-      try {
-        return await getDecryptionPassword(id)
-      } catch {
-        return getServerPassword(id)
-      }
-    },
-  })
+  const sdk = new Vultisig({})
 
   await sdk.initialize()
 
   const vaultContent = await fs.readFile(vaultEntry.filePath, 'utf-8')
-  const vault = await sdk.importVault(vaultContent, undefined)
+
+  // Retrieve decryption password from keyring if vault is encrypted
+  let password: string | undefined
+  try {
+    password = await getDecryptionPassword(vaultEntry.id)
+  } catch {
+    // No decryption password stored — vault may be unencrypted,
+    // or for fast vaults try the server password
+    try {
+      password = await getServerPassword(vaultEntry.id)
+    } catch {
+      // No password available — pass undefined, SDK will throw if vault is encrypted
+    }
+  }
+
+  const vault = await sdk.importVault(vaultContent, password)
 
   return { sdk, vault, vaultEntry }
 }
