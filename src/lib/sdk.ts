@@ -21,11 +21,12 @@ export async function createSdkWithVault(vaultId?: string) {
 
   const sdk = new Vultisig({
     onPasswordRequired: async (id: string) => {
-      // For fast vaults the server password doubles as the vault password
+      // Try decryption password first (primary use: encrypted vault files)
+      // Fall back to server password (fast vaults where server pw = vault pw)
       try {
-        return await getServerPassword(id)
+        return await getDecryptionPassword(id)
       } catch {
-        return getDecryptionPassword(id)
+        return getServerPassword(id)
       }
     },
   })

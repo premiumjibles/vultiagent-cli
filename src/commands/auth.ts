@@ -125,6 +125,8 @@ export async function authLogout(opts: { vaultId?: string; all?: boolean }): Pro
     config.vaults = []
   } else if (config.vaults.length > 1) {
     throw new UsageError('Multiple vaults configured. Use --vault-id <id> or --all.', 'Run: vasig auth status')
+  } else {
+    throw new UsageError('No vaults configured.', 'Run: vasig auth')
   }
 
   await saveConfig(config)
