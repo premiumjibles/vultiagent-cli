@@ -18,6 +18,16 @@ const SYMBOL_TO_COINGECKO: Record<string, string> = {
   MATIC: 'matic-network',
   SUI: 'sui',
   TON: 'the-open-network',
+  USDC: 'usd-coin',
+  USDT: 'tether',
+  PEPE: 'pepe',
+  PUMP: 'pump',
+  WETH: 'weth',
+  WBTC: 'wrapped-bitcoin',
+  DAI: 'dai',
+  LINK: 'chainlink',
+  UNI: 'uniswap',
+  ARB: 'arbitrum',
 }
 
 async function fetchFiatPrices(symbols: string[]): Promise<Record<string, number>> {
@@ -54,6 +64,29 @@ export async function getBalances(opts: BalanceOpts): Promise<BalanceResult[]> {
   try {
     let results: BalanceResult[]
 
+    // Auto-discover tokens if --include-tokens is set
+    if (opts.includeTokens) {
+      const chains = opts.chain ? [opts.chain] : [...vault.chains]
+      for (const chain of chains) {
+        try {
+          const discovered = await vault.discoverTokens(chain)
+          for (const d of discovered) {
+            const raw = d as Record<string, unknown>
+            await vault.addToken(chain, {
+              id: String(raw.contractAddress ?? raw.id ?? ''),
+              symbol: String(raw.ticker ?? raw.symbol ?? 'UNKNOWN'),
+              name: String(raw.ticker ?? raw.name ?? 'Unknown'),
+              decimals: Number(raw.decimals ?? 18),
+              contractAddress: String(raw.contractAddress ?? ''),
+              chainId: chain,
+            } as any)
+          }
+        } catch {
+          // Chain doesn't support token discovery
+        }
+      }
+    }
+
     if (opts.chain) {
       const balance = await vault.balance(opts.chain, undefined)
       results = [{
@@ -61,6 +94,24 @@ export async function getBalances(opts: BalanceOpts): Promise<BalanceResult[]> {
         symbol: balance.symbol,
         amount: balance.formattedAmount ?? balance.amount,
       }]
+      // Also fetch token balances for this chain
+      if (opts.includeTokens) {
+        const tokens = vault.getTokens(opts.chain)
+        for (const t of tokens) {
+          const raw = t as Record<string, unknown>
+          const tokenId = String(raw.id ?? raw.contractAddress ?? '')
+          try {
+            const tb = await vault.balance(opts.chain, tokenId)
+            results.push({
+              chain: opts.chain,
+              symbol: tb.symbol ?? String(raw.symbol ?? raw.ticker ?? 'UNKNOWN'),
+              amount: tb.formattedAmount ?? tb.amount,
+            })
+          } catch {
+            // skip tokens that fail to fetch
+          }
+        }
+      }
     } else {
       const balances = await vault.balances(undefined, opts.includeTokens)
       results = Object.values(balances).map((b) => ({

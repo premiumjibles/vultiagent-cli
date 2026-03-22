@@ -151,6 +151,19 @@ program
     await manageChainsCommand(opts, getFormat())
   })
 
+program
+  .command('tokens')
+  .description('[Wallet] Discover and manage tracked tokens')
+  .option('--discover', 'auto-discover tokens with balances')
+  .option('--chain <chain>', 'chain to operate on')
+  .option('--add <contractAddress>', 'add a token by contract address')
+  .option('--symbol <symbol>', 'token symbol (used with --add)')
+  .option('--decimals <decimals>', 'token decimals (used with --add, default 18)')
+  .action(async (opts) => {
+    const { tokensCommand } = await import('./commands/tokens.js')
+    await tokensCommand(opts, getFormat())
+  })
+
 function getFormat(): OutputFormat {
   return program.opts().output as OutputFormat
 }
