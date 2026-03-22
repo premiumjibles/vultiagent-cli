@@ -8,7 +8,7 @@ import {
   getServerPassword,
 } from '../auth/credential-store.js'
 import { loadConfig, saveConfig } from '../auth/config.js'
-import { discoverVaultFiles } from '../auth/vault-discovery.js'
+import { discoverVaultFiles, SEARCH_DIRS } from '../auth/vault-discovery.js'
 import { UsageError } from '../lib/errors.js'
 
 interface AuthSetupOpts {
@@ -24,7 +24,12 @@ export async function authSetup(opts: AuthSetupOpts): Promise<{ vaultId: string;
     const files = await discoverVaultFiles(extraDirs.map((f) => f.replace(/\/[^/]+$/, '')))
 
     if (files.length === 0) {
-      throw new Error('No .vult files found. Use --vault-file <path> to specify one.')
+      const searched = [...SEARCH_DIRS, process.cwd()].join('\n  - ')
+      throw new Error(
+        `No .vult files found. Searched:\n  - ${searched}\n\n` +
+        'Export your vault from the Vultisig app and place the .vult file in one of these locations,\n' +
+        'or specify the path directly: vasig auth --vault-file /path/to/vault.vult'
+      )
     }
 
     if (files.length === 1) {

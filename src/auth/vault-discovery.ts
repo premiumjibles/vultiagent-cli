@@ -5,7 +5,12 @@ import * as os from 'node:os'
 const SEARCH_DIRS = [
   path.join(os.homedir(), '.vultisig'),
   path.join(os.homedir(), 'Documents', 'Vultisig'),
+  path.join(os.homedir(), 'Downloads'),
+  path.join(os.homedir(), 'Desktop'),
+  path.join(os.homedir(), 'Documents'),
 ]
+
+export { SEARCH_DIRS }
 
 export async function discoverVaultFiles(extraDirs: string[] = []): Promise<string[]> {
   const dirs = [...SEARCH_DIRS, process.cwd(), ...extraDirs]
