@@ -1,7 +1,7 @@
 import { Vultisig } from '@vultisig/sdk'
 import { createSdkWithVault } from '../lib/sdk.js'
 import { printResult } from '../lib/output.js'
-import { NetworkError } from '../lib/errors.js'
+import { NetworkError, UsageError } from '../lib/errors.js'
 import { signWithRetry } from '../lib/signing.js'
 import type { OutputFormat } from '../lib/output.js'
 import type { SwapQuoteResult, SwapResult } from '../types.js'
@@ -112,6 +112,17 @@ export async function executeSwap(opts: SwapOpts, format: OutputFormat): Promise
       autoApprove: false,
     })
 
+    const validation = await vault.validateTransaction(keysignPayload)
+    if (validation?.isRisky && !opts.yes) {
+      throw new UsageError(
+        `Swap flagged as risky (${validation.riskLevel}): ${validation.description}`,
+        `Details: ${validation.features.join(', ')}. Use --yes to override.`
+      )
+    }
+    if (validation?.isRisky) {
+      process.stderr.write(`⚠ Risk warning (${validation.riskLevel}): ${validation.description}\n`)
+    }
+
     let approvalTxHash: string | undefined
 
     if (approvalPayload) {
@@ -165,5 +176,6 @@ export async function swapQuoteCommand(opts: SwapOpts, format: OutputFormat): Pr
 
 export async function swapChainsCommand(format: OutputFormat): Promise<void> {
   const chains = await getSupportedChains()
-  printResult(chains.map((c) => ({ chain: c })), format)
+  const unique = [...new Set(chains)]
+  printResult(unique.map((c) => ({ chain: c })), format)
 }

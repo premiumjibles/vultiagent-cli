@@ -50,5 +50,13 @@ export async function createSdkWithVault(vaultId?: string) {
     }
   }
 
+  // Restore persisted tokens
+  const persistedTokens = vaultEntry.tokens ?? {}
+  for (const [chain, tokens] of Object.entries(persistedTokens)) {
+    for (const t of tokens) {
+      await vault.addToken(chain, { ...t, name: t.symbol, chainId: chain })
+    }
+  }
+
   return { sdk, vault, vaultEntry }
 }

@@ -2,6 +2,8 @@ import { createSdkWithVault } from '../lib/sdk.js'
 import { printResult } from '../lib/output.js'
 import { NetworkError } from '../lib/errors.js'
 import { toToken } from '../lib/tokens.js'
+import { persistTokens } from '../auth/config.js'
+import type { PersistedToken } from '../auth/config.js'
 import type { OutputFormat } from '../lib/output.js'
 import type { BalanceResult } from '../types.js'
 
@@ -12,20 +14,34 @@ interface BalanceOpts {
 }
 
 export async function getBalances(opts: BalanceOpts): Promise<BalanceResult[]> {
-  const { sdk, vault } = await createSdkWithVault()
+  const { sdk, vault, vaultEntry } = await createSdkWithVault()
 
   try {
-    // Auto-discover tokens if --include-tokens is set
+    // Auto-discover tokens on first use if none persisted
     if (opts.includeTokens) {
-      const chains = opts.chain ? [opts.chain] : [...vault.chains]
-      for (const chain of chains) {
-        try {
-          const discovered = await vault.discoverTokens(chain)
-          for (const d of discovered) {
-            await vault.addToken(chain, toToken(d))
+      const hasPersistedTokens = Object.keys(vaultEntry.tokens ?? {}).length > 0
+      if (!hasPersistedTokens) {
+        const chains = opts.chain ? [opts.chain] : [...vault.chains]
+        for (const chain of chains) {
+          try {
+            const discovered = await vault.discoverTokens(chain)
+            const chainTokens: PersistedToken[] = []
+            for (const d of discovered) {
+              const token = toToken(d)
+              await vault.addToken(chain, token)
+              chainTokens.push({
+                id: token.contractAddress ?? token.id,
+                symbol: token.symbol,
+                decimals: token.decimals,
+                contractAddress: token.contractAddress ?? '',
+              })
+            }
+            if (chainTokens.length > 0) {
+              await persistTokens(vaultEntry.id, chain, chainTokens)
+            }
+          } catch {
+            // Chain doesn't support token discovery
           }
-        } catch {
-          // Chain doesn't support token discovery
         }
       }
     }

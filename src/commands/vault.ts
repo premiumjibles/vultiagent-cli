@@ -6,7 +6,7 @@ import type { VaultInfoResult } from '../types.js'
 
 export async function listVaults(): Promise<Array<{ id: string; name: string; filePath: string }>> {
   const config = await loadConfig()
-  return config.vaults
+  return config.vaults.map((v) => ({ id: v.id, name: v.name, filePath: v.filePath }))
 }
 
 export async function getVaultInfo(): Promise<VaultInfoResult> {
@@ -27,12 +27,12 @@ export async function getVaultInfo(): Promise<VaultInfoResult> {
   }
 }
 
-export async function vaultsCommand(format: OutputFormat): Promise<void> {
-  const result = await listVaults()
-  printResult(result, format)
-}
-
-export async function vaultInfoCommand(format: OutputFormat): Promise<void> {
+export async function vaultCommand(opts: { list?: boolean }, format: OutputFormat): Promise<void> {
+  if (opts.list) {
+    const result = await listVaults()
+    printResult(result, format)
+    return
+  }
   const result = await getVaultInfo()
   printResult(result, format)
 }

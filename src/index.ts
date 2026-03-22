@@ -125,19 +125,12 @@ program
 
 // --- Vault Management ---
 program
-  .command('vaults')
-  .description('[Vault Management] List authenticated vaults')
-  .action(async () => {
-    const { vaultsCommand } = await import('./commands/vault.js')
-    await vaultsCommand(getFormat())
-  })
-
-program
-  .command('vault-info')
-  .description('[Vault Management] Show details of active vault')
-  .action(async () => {
-    const { vaultInfoCommand } = await import('./commands/vault.js')
-    await vaultInfoCommand(getFormat())
+  .command('vault')
+  .description('[Vault Management] Show vault details')
+  .option('--list', 'list all authenticated vaults')
+  .action(async (opts) => {
+    const { vaultCommand } = await import('./commands/vault.js')
+    await vaultCommand(opts, getFormat())
   })
 
 program
@@ -156,9 +149,11 @@ program
   .description('[Wallet] Discover and manage tracked tokens')
   .option('--discover', 'auto-discover tokens with balances')
   .option('--chain <chain>', 'chain to operate on')
-  .option('--add <contractAddress>', 'add a token by contract address')
-  .option('--symbol <symbol>', 'token symbol (used with --add)')
-  .option('--decimals <decimals>', 'token decimals (used with --add, default 18)')
+  .option('--add <contractAddress>', 'add a token by contract address (auto-resolves metadata)')
+  .option('--remove <contractAddress>', 'remove a tracked token')
+  .option('--clear', 'clear all tracked tokens')
+  .option('--symbol <symbol>', 'token symbol (used with --add, auto-detected if omitted)')
+  .option('--decimals <decimals>', 'token decimals (used with --add, auto-detected if omitted)')
   .action(async (opts) => {
     const { tokensCommand } = await import('./commands/tokens.js')
     await tokensCommand(opts, getFormat())

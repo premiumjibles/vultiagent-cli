@@ -1,7 +1,7 @@
 import { Vultisig } from '@vultisig/sdk'
 import { createSdkWithVault } from '../lib/sdk.js'
 import { printResult } from '../lib/output.js'
-import { NetworkError } from '../lib/errors.js'
+import { NetworkError, UsageError } from '../lib/errors.js'
 import { signWithRetry } from '../lib/signing.js'
 import type { OutputFormat } from '../lib/output.js'
 import type { SendResult } from '../types.js'
@@ -50,6 +50,17 @@ export async function executeSend(opts: SendOpts): Promise<SendResult> {
       amount,
       memo: opts.memo,
     })
+
+    const validation = await vault.validateTransaction(payload)
+    if (validation?.isRisky && !opts.yes) {
+      throw new UsageError(
+        `Transaction flagged as risky (${validation.riskLevel}): ${validation.description}`,
+        `Details: ${validation.features.join(', ')}. Use --yes to override.`
+      )
+    }
+    if (validation?.isRisky) {
+      process.stderr.write(`⚠ Risk warning (${validation.riskLevel}): ${validation.description}\n`)
+    }
 
     const messageHashes = await vault.extractMessageHashes(payload)
     const signature = await signWithRetry(() =>
