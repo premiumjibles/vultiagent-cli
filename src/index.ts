@@ -159,6 +159,7 @@ async function main() {
     }
     if (err instanceof Error && err.message !== '') {
       printError(err, getFormat())
+      process.exit(ExitCode.USAGE)
     }
     process.exit(ExitCode.USAGE)
   }

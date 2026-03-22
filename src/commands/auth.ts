@@ -52,20 +52,41 @@ export async function authSetup(opts: AuthSetupOpts): Promise<{ vaultId: string;
   const sdk = new Vultisig({})
   const isEncrypted = sdk.isVaultEncrypted(vaultContent)
 
+  let vault: Awaited<ReturnType<typeof sdk.importVault>> | undefined
   let decryptPassword: string | undefined
+
   if (isEncrypted) {
-    const { password } = await inquirer.prompt([
-      {
-        type: 'password',
-        name: 'password',
-        message: 'Enter vault decryption password:',
-        mask: '*',
-      },
-    ])
-    decryptPassword = password
+    const MAX_ATTEMPTS = 3
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      const { password } = await inquirer.prompt([
+        {
+          type: 'password',
+          name: 'password',
+          message: attempt === 1
+            ? 'Enter vault decryption password (the password you set when exporting from the Vultisig app):'
+            : `Wrong password. Try again (attempt ${attempt}/${MAX_ATTEMPTS}):`,
+          mask: '*',
+        },
+      ])
+      try {
+        vault = await sdk.importVault(vaultContent, password)
+        decryptPassword = password
+        break
+      } catch {
+        if (attempt === MAX_ATTEMPTS) {
+          throw new UsageError(
+            'Failed to decrypt vault after 3 attempts. Check your decryption password.',
+            'This is the password you set when exporting the vault from the Vultisig app.'
+          )
+        }
+      }
+    }
+  } else {
+    vault = await sdk.importVault(vaultContent, undefined)
   }
 
-  const vault = await sdk.importVault(vaultContent, decryptPassword)
+  // vault is guaranteed set — the loop either sets it or throws
+  const v = vault!
 
   const { serverPassword } = await inquirer.prompt([
     {
@@ -76,14 +97,14 @@ export async function authSetup(opts: AuthSetupOpts): Promise<{ vaultId: string;
     },
   ])
 
-  await setServerPassword(vault.id, serverPassword)
+  await setServerPassword(v.id, serverPassword)
   if (isEncrypted && decryptPassword) {
-    await setDecryptionPassword(vault.id, decryptPassword)
+    await setDecryptionPassword(v.id, decryptPassword)
   }
 
   const config = await loadConfig()
-  const existing = config.vaults.findIndex((v) => v.id === vault.id)
-  const entry = { id: vault.id, name: vault.name, filePath: vaultFilePath! }
+  const existing = config.vaults.findIndex((c) => c.id === v.id)
+  const entry = { id: v.id, name: v.name, filePath: vaultFilePath! }
   if (existing >= 0) {
     config.vaults[existing] = entry
   } else {
@@ -93,7 +114,7 @@ export async function authSetup(opts: AuthSetupOpts): Promise<{ vaultId: string;
 
   if (typeof sdk.dispose === 'function') sdk.dispose()
 
-  return { vaultId: vault.id, vaultName: vault.name }
+  return { vaultId: v.id, vaultName: v.name }
 }
 
 export async function authStatus(): Promise<Array<{ id: string; name: string; filePath: string; hasCredentials: boolean }>> {
