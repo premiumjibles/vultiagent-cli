@@ -6,6 +6,7 @@ import {
   NetworkError,
   ExitCode,
   toErrorJson,
+  cleanSdkMessage,
 } from '../../src/lib/errors.js'
 
 describe('error types', () => {
@@ -47,5 +48,42 @@ describe('error types', () => {
     expect(json.ok).toBe(false)
     expect(json.error.code).toBe('UNKNOWN_ERROR')
     expect(json.error.message).toBe('something broke')
+  })
+})
+
+describe('cleanSdkMessage', () => {
+  it('replaces ContractFunctionExecutionError with clean message', () => {
+    expect(cleanSdkMessage('ContractFunctionExecutionError: call failed')).toBe('Contract call failed')
+  })
+
+  it('replaces BigInt conversion error', () => {
+    expect(cleanSdkMessage('Cannot convert abc to a BigInt')).toBe('Invalid amount')
+  })
+
+  it('replaces NaN with clean message', () => {
+    expect(cleanSdkMessage('got NaN for value')).toBe('Invalid numeric value')
+  })
+
+  it('strips LI.FI SDK version tags', () => {
+    expect(cleanSdkMessage('[LI.FI SDK v2.1] some error')).toBe('some error')
+  })
+
+  it('strips Details: blocks', () => {
+    const input = 'Transaction failed\n\nDetails: some verbose info\nmore details'
+    expect(cleanSdkMessage(input)).toBe('Transaction failed')
+  })
+
+  it('strips docs.li.fi URLs', () => {
+    expect(cleanSdkMessage('Route not found. Check https://docs.li.fi/errors')).toBe('Route not found.')
+  })
+
+  it('returns original when cleaned result is empty', () => {
+    const input = '[LI.FI SDK v2.1] '
+    const result = cleanSdkMessage(input)
+    expect(result).toBe(input)
+  })
+
+  it('returns empty string as-is', () => {
+    expect(cleanSdkMessage('')).toBe('')
   })
 })

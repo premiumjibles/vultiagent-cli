@@ -1,7 +1,7 @@
 import { Vultisig } from '@vultisig/sdk'
-import { createSdkWithVault } from '../lib/sdk.js'
+import { withVault } from '../lib/sdk.js'
 import { printResult } from '../lib/output.js'
-import { NetworkError, UsageError, InsufficientBalanceError, classifyError, VasigError } from '../lib/errors.js'
+import { UsageError, InsufficientBalanceError } from '../lib/errors.js'
 import { resolveChain, parseAmount, isEvmChain } from '../lib/validation.js'
 import { signWithRetry } from '../lib/signing.js'
 import type { OutputFormat } from '../lib/output.js'
@@ -30,9 +30,7 @@ export async function executeSend(opts: SendOpts): Promise<SendResult> {
     )
   }
 
-  const { sdk, vault } = await createSdkWithVault()
-
-  try {
+  return withVault(async ({ vault }) => {
     const address = await vault.address(chain)
     const balance = await vault.balance(chain, opts.token)
 
@@ -99,16 +97,7 @@ export async function executeSend(opts: SendOpts): Promise<SendResult> {
       : opts.amount
 
     return { txHash, chain: chain, explorerUrl, amount: displayAmount, to: opts.to, symbol: balance.symbol }
-  } catch (err: unknown) {
-    if (err instanceof VasigError) throw err
-    if (err instanceof Error && (err.message.includes('network') || err.message.includes('timeout'))) {
-      throw new NetworkError(err.message)
-    }
-    if (err instanceof Error) throw classifyError(err)
-    throw err
-  } finally {
-    if (typeof sdk.dispose === 'function') sdk.dispose()
-  }
+  })
 }
 
 export async function sendCommand(opts: SendOpts, format: OutputFormat): Promise<void> {

@@ -13,10 +13,11 @@ const { mockVault } = vi.hoisted(() => ({
 }))
 
 vi.mock('../../src/lib/sdk.js', () => ({
-  createSdkWithVault: vi.fn().mockResolvedValue({
+  withVault: vi.fn(async (fn) => fn({
     sdk: { dispose: vi.fn() },
     vault: mockVault,
-  }),
+    vaultEntry: { id: 'vault-123', name: 'TestVault', filePath: '/test.vult' },
+  })),
 }))
 
 vi.mock('node:fs/promises', async (importOriginal) => {

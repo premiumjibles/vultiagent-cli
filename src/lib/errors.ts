@@ -119,7 +119,7 @@ const SDK_STRIP_PATTERNS: RegExp[] = [
   /Version: @lifi\/sdk@[\d.]+/gi,
 ]
 
-function cleanSdkMessage(message: string): string {
+export function cleanSdkMessage(message: string): string {
   if (!message) return message
 
   for (const [pattern, replacement] of SDK_NOISE_REPLACEMENTS) {

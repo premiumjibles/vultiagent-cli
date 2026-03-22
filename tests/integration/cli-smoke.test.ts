@@ -16,8 +16,8 @@ describe('CLI smoke tests', () => {
     expect(output).toContain('send')
     expect(output).toContain('swap')
     expect(output).toContain('addresses')
-    expect(output).toContain('vaults')
-    expect(output).toContain('vault-info')
+    expect(output).toContain('vault')
+    expect(output).toContain('chains')
   })
 
   it('--version returns semver', () => {

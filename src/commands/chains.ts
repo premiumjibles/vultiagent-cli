@@ -1,5 +1,5 @@
 import { SUPPORTED_CHAINS } from '@vultisig/sdk'
-import { createSdkWithVault } from '../lib/sdk.js'
+import { withVault } from '../lib/sdk.js'
 import { loadConfig, saveConfig } from '../auth/config.js'
 import { printResult } from '../lib/output.js'
 import { InvalidChainError } from '../lib/errors.js'
@@ -22,9 +22,7 @@ async function persistExtraChains(vaultId: string, extraChains: string[]): Promi
 }
 
 export async function manageChainsCommand(opts: ChainsOpts, format: OutputFormat): Promise<void> {
-  const { sdk, vault, vaultEntry } = await createSdkWithVault()
-
-  try {
+  return withVault(async ({ vault, vaultEntry }) => {
     // Get the default chains from the .vult file (before our extras)
     const config = await loadConfig()
     const entry = config.vaults.find((v) => v.id === vaultEntry.id)
@@ -94,7 +92,5 @@ export async function manageChainsCommand(opts: ChainsOpts, format: OutputFormat
       supported: [...SUPPORTED_CHAINS],
       supportedCount: SUPPORTED_CHAINS.length,
     }, format)
-  } finally {
-    if (typeof sdk.dispose === 'function') sdk.dispose()
-  }
+  })
 }

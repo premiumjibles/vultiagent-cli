@@ -1,10 +1,9 @@
-import { createSdkWithVault } from '../lib/sdk.js'
+import { withVault } from '../lib/sdk.js'
 import { printResult } from '../lib/output.js'
 import { UsageError, TokenNotFoundError } from '../lib/errors.js'
 import { resolveChain } from '../lib/validation.js'
-import { toToken } from '../lib/tokens.js'
+import { discoverAndPersistTokens } from '../lib/tokens.js'
 import { persistTokens, removePersistedToken, clearPersistedTokens } from '../auth/config.js'
-import type { PersistedToken } from '../auth/config.js'
 import type { OutputFormat } from '../lib/output.js'
 
 interface TokensOpts {
@@ -18,9 +17,7 @@ interface TokensOpts {
 }
 
 export async function tokensCommand(opts: TokensOpts, format: OutputFormat): Promise<void> {
-  const { sdk, vault, vaultEntry } = await createSdkWithVault()
-
-  try {
+  return withVault(async ({ vault, vaultEntry }) => {
     const chain = opts.chain ? resolveChain(opts.chain) : undefined
 
     if (opts.clear) {
@@ -55,40 +52,7 @@ export async function tokensCommand(opts: TokensOpts, format: OutputFormat): Pro
 
     if (opts.discover) {
       const chains = chain ? [String(chain)] : [...vault.chains]
-      const allDiscovered: Array<{ chain: string; contractAddress: string; symbol: string; decimals: number }> = []
-
-      for (const chain of chains) {
-        try {
-          const discovered = await vault.discoverTokens(chain)
-          const chainTokens: PersistedToken[] = []
-          for (const d of discovered) {
-            const token = toToken(d)
-            await vault.addToken(chain, token)
-            const persisted: PersistedToken = {
-              id: token.contractAddress ?? token.id,
-              symbol: token.symbol,
-              decimals: token.decimals,
-              contractAddress: token.contractAddress ?? '',
-            }
-            chainTokens.push(persisted)
-            allDiscovered.push({
-              chain,
-              contractAddress: persisted.contractAddress,
-              symbol: persisted.symbol,
-              decimals: persisted.decimals,
-            })
-          }
-          if (chainTokens.length > 0) {
-            // Merge with existing persisted tokens for this chain
-            const existing = vault.getTokens(chain)
-              .filter((t) => !chainTokens.some((ct) => ct.contractAddress === (t.contractAddress ?? t.id)))
-              .map((t) => ({ id: t.id, symbol: t.symbol, decimals: t.decimals, contractAddress: t.contractAddress ?? '' }))
-            await persistTokens(vaultEntry.id, chain, [...existing, ...chainTokens])
-          }
-        } catch {
-          // Chain doesn't support discovery — skip
-        }
-      }
+      const allDiscovered = await discoverAndPersistTokens(vault, vaultEntry.id, chains, { mergeExisting: true })
 
       printResult({
         action: 'discover',
@@ -163,7 +127,5 @@ export async function tokensCommand(opts: TokensOpts, format: OutputFormat): Pro
       tokens: tokenList,
       count: tokenList.length,
     }, format)
-  } finally {
-    if (typeof sdk.dispose === 'function') sdk.dispose()
-  }
+  })
 }

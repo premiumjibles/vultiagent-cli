@@ -1,10 +1,7 @@
-import { createSdkWithVault } from '../lib/sdk.js'
+import { withVault } from '../lib/sdk.js'
 import { printResult } from '../lib/output.js'
-import { NetworkError } from '../lib/errors.js'
 import { resolveChain } from '../lib/validation.js'
-import { toToken } from '../lib/tokens.js'
-import { persistTokens } from '../auth/config.js'
-import type { PersistedToken } from '../auth/config.js'
+import { discoverAndPersistTokens } from '../lib/tokens.js'
 import type { OutputFormat } from '../lib/output.js'
 import type { BalanceResult } from '../types.js'
 
@@ -16,35 +13,14 @@ interface BalanceOpts {
 
 export async function getBalances(opts: BalanceOpts): Promise<BalanceResult[]> {
   const chain = opts.chain ? resolveChain(opts.chain) : undefined
-  const { sdk, vault, vaultEntry } = await createSdkWithVault()
 
-  try {
+  return withVault(async ({ vault, vaultEntry }) => {
     // Auto-discover tokens on first use if none persisted
     if (opts.includeTokens) {
       const hasPersistedTokens = Object.keys(vaultEntry.tokens ?? {}).length > 0
       if (!hasPersistedTokens) {
         const chains = chain ? [String(chain)] : [...vault.chains]
-        for (const chain of chains) {
-          try {
-            const discovered = await vault.discoverTokens(chain)
-            const chainTokens: PersistedToken[] = []
-            for (const d of discovered) {
-              const token = toToken(d)
-              await vault.addToken(chain, token)
-              chainTokens.push({
-                id: token.contractAddress ?? token.id,
-                symbol: token.symbol,
-                decimals: token.decimals,
-                contractAddress: token.contractAddress ?? '',
-              })
-            }
-            if (chainTokens.length > 0) {
-              await persistTokens(vaultEntry.id, chain, chainTokens)
-            }
-          } catch {
-            // Chain doesn't support token discovery
-          }
-        }
+        await discoverAndPersistTokens(vault, vaultEntry.id, chains)
       }
     }
 
@@ -127,14 +103,7 @@ export async function getBalances(opts: BalanceOpts): Promise<BalanceResult[]> {
       if (b.decimals != null) result.decimals = b.decimals
       return result
     })
-  } catch (err: unknown) {
-    if (err instanceof Error && (err.message.includes('network') || err.message.includes('timeout'))) {
-      throw new NetworkError(err.message)
-    }
-    throw err
-  } finally {
-    if (typeof sdk.dispose === 'function') sdk.dispose()
-  }
+  })
 }
 
 export async function balanceCommand(opts: BalanceOpts, format: OutputFormat): Promise<void> {

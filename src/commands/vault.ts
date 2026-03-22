@@ -1,5 +1,5 @@
 import { loadConfig } from '../auth/config.js'
-import { createSdkWithVault } from '../lib/sdk.js'
+import { withVault } from '../lib/sdk.js'
 import { printResult } from '../lib/output.js'
 import type { OutputFormat } from '../lib/output.js'
 import type { VaultInfoResult } from '../types.js'
@@ -10,21 +10,15 @@ export async function listVaults(): Promise<Array<{ id: string; name: string; fi
 }
 
 export async function getVaultInfo(): Promise<VaultInfoResult> {
-  const { sdk, vault } = await createSdkWithVault()
-
-  try {
-    return {
-      id: vault.id,
-      name: vault.name,
-      type: vault.type,
-      chains: [...vault.chains],
-      isEncrypted: vault.isEncrypted,
-      threshold: vault.threshold,
-      totalSigners: vault.totalSigners,
-    }
-  } finally {
-    if (typeof sdk.dispose === 'function') sdk.dispose()
-  }
+  return withVault(async ({ vault }) => ({
+    id: vault.id,
+    name: vault.name,
+    type: vault.type,
+    chains: [...vault.chains],
+    isEncrypted: vault.isEncrypted,
+    threshold: vault.threshold,
+    totalSigners: vault.totalSigners,
+  }))
 }
 
 export async function vaultCommand(opts: { list?: boolean }, format: OutputFormat): Promise<void> {

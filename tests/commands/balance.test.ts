@@ -13,15 +13,19 @@ const mockVault = vi.hoisted(() => ({
 }))
 
 vi.mock('../../src/lib/sdk.js', () => ({
-  createSdkWithVault: vi.fn().mockResolvedValue({
+  withVault: vi.fn(async (fn) => fn({
     sdk: { dispose: vi.fn() },
     vault: mockVault,
     vaultEntry: { id: 'vault-123', tokens: {} },
-  }),
+  })),
 }))
 
 vi.mock('../../src/auth/config.js', () => ({
   persistTokens: vi.fn(),
+}))
+
+vi.mock('../../src/lib/tokens.js', () => ({
+  discoverAndPersistTokens: vi.fn().mockResolvedValue([]),
 }))
 
 import { getBalances } from '../../src/commands/balance.js'

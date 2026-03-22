@@ -2,7 +2,7 @@ import * as fs from 'node:fs/promises'
 import { Vultisig } from '@vultisig/sdk'
 import { loadConfig } from '../auth/config.js'
 import { getDecryptionPassword, getServerPassword } from '../auth/credential-store.js'
-import { AuthRequiredError } from './errors.js'
+import { AuthRequiredError, VasigError, NetworkError, classifyError } from './errors.js'
 
 export async function createSdkWithVault(vaultId?: string) {
   const config = await loadConfig()
@@ -59,4 +59,25 @@ export async function createSdkWithVault(vaultId?: string) {
   }
 
   return { sdk, vault, vaultEntry }
+}
+
+export type VaultContext = Awaited<ReturnType<typeof createSdkWithVault>>
+
+export async function withVault<T>(
+  fn: (ctx: VaultContext) => Promise<T>,
+  vaultId?: string,
+): Promise<T> {
+  const ctx = await createSdkWithVault(vaultId)
+  try {
+    return await fn(ctx)
+  } catch (err: unknown) {
+    if (err instanceof VasigError) throw err
+    if (err instanceof Error && (err.message.includes('network') || err.message.includes('timeout'))) {
+      throw new NetworkError(err.message)
+    }
+    if (err instanceof Error) throw classifyError(err)
+    throw err
+  } finally {
+    if (typeof ctx.sdk.dispose === 'function') ctx.sdk.dispose()
+  }
 }

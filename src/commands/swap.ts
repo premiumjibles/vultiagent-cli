@@ -1,7 +1,7 @@
 import { Vultisig } from '@vultisig/sdk'
-import { createSdkWithVault } from '../lib/sdk.js'
+import { withVault } from '../lib/sdk.js'
 import { printResult } from '../lib/output.js'
-import { NetworkError, UsageError, NoRouteError, classifyError, VasigError } from '../lib/errors.js'
+import { UsageError, NoRouteError } from '../lib/errors.js'
 import { resolveChain, parseAmount } from '../lib/validation.js'
 import { signWithRetry } from '../lib/signing.js'
 import type { OutputFormat } from '../lib/output.js'
@@ -41,62 +41,67 @@ function buildSwapQuoteParams(opts: SwapOpts) {
   }
 }
 
-function formatAmount(raw: bigint, decimals: number): string {
+export function formatAmount(raw: bigint, decimals: number): string {
   const s = raw.toString().padStart(decimals + 1, '0')
   const whole = s.slice(0, s.length - decimals)
   const frac = s.slice(s.length - decimals).replace(/0+$/, '')
   return frac ? `${whole}.${frac}` : whole
 }
 
-export async function getSwapQuote(opts: SwapOpts): Promise<SwapQuoteResult> {
-  const { sdk, vault } = await createSdkWithVault()
+interface QuoteLike {
+  fromCoin: { chain: string; ticker: string }
+  toCoin: { chain: string; ticker: string; decimals: number }
+  estimatedOutput: bigint
+  estimatedOutputFiat?: number | null
+  requiresApproval?: boolean
+  warnings: string[]
+  provider: string
+}
 
-  try {
+export function mapQuoteResult(quote: QuoteLike, inputAmount: string): SwapQuoteResult {
+  const result: SwapQuoteResult = {
+    fromChain: quote.fromCoin.chain,
+    fromToken: quote.fromCoin.ticker,
+    toChain: quote.toCoin.chain,
+    toToken: quote.toCoin.ticker,
+    inputAmount,
+    estimatedOutput: formatAmount(quote.estimatedOutput, quote.toCoin.decimals),
+    provider: quote.provider,
+  }
+  if (quote.estimatedOutputFiat != null) {
+    result.estimatedOutputFiat = parseFloat(quote.estimatedOutputFiat.toFixed(2))
+  }
+  if (quote.requiresApproval) {
+    result.requiresApproval = true
+  }
+  if (quote.warnings.length > 0) {
+    result.warnings = [...quote.warnings]
+  }
+  return result
+}
+
+export async function getSwapQuote(opts: SwapOpts): Promise<SwapQuoteResult> {
+  return withVault(async ({ vault }) => {
     const { quoteRequest } = buildSwapQuoteParams(opts)
     const quote = await vault.getSwapQuote(quoteRequest)
 
-    const result: SwapQuoteResult = {
-      fromChain: quote.fromCoin.chain,
-      fromToken: quote.fromCoin.ticker,
-      toChain: quote.toCoin.chain,
-      toToken: quote.toCoin.ticker,
-      inputAmount: opts.amount,
-      estimatedOutput: formatAmount(quote.estimatedOutput, quote.toCoin.decimals),
-      provider: quote.provider,
-    }
-    if (quote.estimatedOutputFiat != null) {
-      result.estimatedOutputFiat = parseFloat(quote.estimatedOutputFiat.toFixed(2))
-    }
-    if (quote.requiresApproval) {
-      result.requiresApproval = true
-    }
-    if (quote.warnings.length > 0) {
-      result.warnings = [...quote.warnings]
-    }
+    const result = mapQuoteResult(quote, opts.amount)
     if ((quote.estimatedOutputFiat == null || quote.estimatedOutputFiat < 0.01) && parseFloat(opts.amount) > 0) {
       result.warnings = [...(result.warnings ?? []), 'Quote output is near-zero — this route may result in fund loss.']
     }
     return result
-  } finally {
-    if (typeof sdk.dispose === 'function') sdk.dispose()
-  }
+  })
 }
 
 export async function getSupportedChains(): Promise<string[]> {
-  const { sdk, vault } = await createSdkWithVault()
-
-  try {
+  return withVault(async ({ vault }) => {
     const chains = await vault.getSupportedSwapChains()
     return [...chains]
-  } finally {
-    if (typeof sdk.dispose === 'function') sdk.dispose()
-  }
+  })
 }
 
 export async function executeSwap(opts: SwapOpts, format: OutputFormat): Promise<SwapResult> {
-  const { sdk, vault } = await createSdkWithVault()
-
-  try {
+  return withVault(async ({ vault }) => {
     const { from, to, quoteRequest } = buildSwapQuoteParams(opts)
     const quote = await vault.getSwapQuote(quoteRequest)
 
@@ -105,18 +110,7 @@ export async function executeSwap(opts: SwapOpts, format: OutputFormat): Promise
     }
 
     // Log quote summary before executing
-    const summary: SwapQuoteResult = {
-      fromChain: quote.fromCoin.chain,
-      fromToken: quote.fromCoin.ticker,
-      toChain: quote.toCoin.chain,
-      toToken: quote.toCoin.ticker,
-      inputAmount: opts.amount,
-      estimatedOutput: formatAmount(quote.estimatedOutput, quote.toCoin.decimals),
-      provider: quote.provider,
-    }
-    if (quote.estimatedOutputFiat != null) {
-      summary.estimatedOutputFiat = parseFloat(quote.estimatedOutputFiat.toFixed(2))
-    }
+    const summary = mapQuoteResult(quote, opts.amount)
     if (format !== 'json') {
       printResult({ action: 'quote', ...summary }, format)
     }
@@ -171,16 +165,7 @@ export async function executeSwap(opts: SwapOpts, format: OutputFormat): Promise
     const result: SwapResult = { txHash, chain: from.chain, explorerUrl }
     if (approvalTxHash) result.approvalTxHash = approvalTxHash
     return result
-  } catch (err: unknown) {
-    if (err instanceof VasigError) throw err
-    if (err instanceof Error && (err.message.includes('network') || err.message.includes('timeout'))) {
-      throw new NetworkError(err.message)
-    }
-    if (err instanceof Error) throw classifyError(err)
-    throw err
-  } finally {
-    if (typeof sdk.dispose === 'function') sdk.dispose()
-  }
+  })
 }
 
 export async function swapCommand(opts: SwapOpts, format: OutputFormat): Promise<void> {
