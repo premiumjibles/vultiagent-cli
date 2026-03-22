@@ -73,7 +73,7 @@ export async function getSwapQuote(opts: SwapOpts): Promise<SwapQuoteResult> {
     if (quote.warnings.length > 0) {
       result.warnings = [...quote.warnings]
     }
-    if (!quote.estimatedOutputFiat && parseFloat(opts.amount) > 0) {
+    if ((quote.estimatedOutputFiat == null || quote.estimatedOutputFiat < 0.01) && parseFloat(opts.amount) > 0) {
       result.warnings = [...(result.warnings ?? []), 'Quote output is near-zero — this route may result in fund loss.']
     }
     return result
@@ -100,7 +100,7 @@ export async function executeSwap(opts: SwapOpts, format: OutputFormat): Promise
     const { from, to, quoteRequest } = buildSwapQuoteParams(opts)
     const quote = await vault.getSwapQuote(quoteRequest)
 
-    if (!quote.estimatedOutputFiat && parseFloat(opts.amount) > 0) {
+    if ((quote.estimatedOutputFiat == null || quote.estimatedOutputFiat < 0.01) && parseFloat(opts.amount) > 0) {
       throw new NoRouteError('Quote output is near-zero — this route would result in fund loss. Try a different route.')
     }
 
