@@ -117,11 +117,16 @@ export async function getBalances(opts: BalanceOpts): Promise<BalanceResult[]> {
     }
 
     const balances = await vault.balances(undefined, opts.includeTokens)
-    return Object.values(balances).map((b) => ({
-      chain: b.chainId,
-      symbol: b.symbol,
-      amount: b.formattedAmount ?? b.amount,
-    }))
+    return Object.values(balances).map((b) => {
+      const result: BalanceResult = {
+        chain: b.chainId,
+        symbol: b.symbol,
+        amount: b.formattedAmount ?? b.amount,
+      }
+      if (b.tokenId) result.contractAddress = b.tokenId
+      if (b.decimals != null) result.decimals = b.decimals
+      return result
+    })
   } catch (err: unknown) {
     if (err instanceof Error && (err.message.includes('network') || err.message.includes('timeout'))) {
       throw new NetworkError(err.message)
