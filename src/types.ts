@@ -1,10 +1,3 @@
-export type OutputFormat = 'json' | 'table'
-
-export interface SuccessJson<T = unknown> {
-  ok: true
-  data: T
-}
-
 export interface BalanceResult {
   chain: string
   symbol: string

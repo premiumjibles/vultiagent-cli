@@ -9,6 +9,7 @@ import {
 } from '../auth/credential-store.js'
 import { loadConfig, saveConfig } from '../auth/config.js'
 import { discoverVaultFiles } from '../auth/vault-discovery.js'
+import { UsageError } from '../lib/errors.js'
 
 interface AuthSetupOpts {
   vaultFile?: string
@@ -119,6 +120,11 @@ export async function authLogout(opts: { vaultId?: string; all?: boolean }): Pro
   } else if (opts.vaultId) {
     await clearCredentials(opts.vaultId)
     config.vaults = config.vaults.filter((v) => v.id !== opts.vaultId)
+  } else if (config.vaults.length === 1) {
+    await clearCredentials(config.vaults[0].id)
+    config.vaults = []
+  } else if (config.vaults.length > 1) {
+    throw new UsageError('Multiple vaults configured. Use --vault-id <id> or --all.', 'Run: vasig auth status')
   }
 
   await saveConfig(config)

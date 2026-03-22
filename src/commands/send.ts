@@ -53,7 +53,6 @@ export async function executeSend(opts: SendOpts): Promise<SendResult> {
     const messageHashes = await vault.extractMessageHashes(payload)
     const signature = await vault.sign(
       { transaction: payload, chain: opts.chain, messageHashes },
-      {}
     )
     const txHash = await vault.broadcastTx({
       chain: opts.chain,

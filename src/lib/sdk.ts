@@ -1,7 +1,7 @@
 import * as fs from 'node:fs/promises'
 import { Vultisig } from '@vultisig/sdk'
 import { loadConfig } from '../auth/config.js'
-import { getDecryptionPassword } from '../auth/credential-store.js'
+import { getDecryptionPassword, getServerPassword } from '../auth/credential-store.js'
 import { AuthRequiredError } from './errors.js'
 
 export async function createSdkWithVault(vaultId?: string) {
@@ -21,21 +21,19 @@ export async function createSdkWithVault(vaultId?: string) {
 
   const sdk = new Vultisig({
     onPasswordRequired: async (id: string) => {
-      return getDecryptionPassword(id)
+      // For fast vaults the server password doubles as the vault password
+      try {
+        return await getServerPassword(id)
+      } catch {
+        return getDecryptionPassword(id)
+      }
     },
   })
 
   await sdk.initialize()
 
   const vaultContent = await fs.readFile(vaultEntry.filePath, 'utf-8')
-  const isEncrypted = sdk.isVaultEncrypted(vaultContent)
-
-  let password: string | undefined
-  if (isEncrypted) {
-    password = await getDecryptionPassword(vaultEntry.id)
-  }
-
-  const vault = await sdk.importVault(vaultContent, password)
+  const vault = await sdk.importVault(vaultContent, undefined)
 
   return { sdk, vault, vaultEntry }
 }
