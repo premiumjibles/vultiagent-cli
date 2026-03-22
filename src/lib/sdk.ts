@@ -41,5 +41,14 @@ export async function createSdkWithVault(vaultId?: string) {
 
   const vault = await sdk.importVault(vaultContent, password)
 
+  // Re-add any extra chains saved in config
+  if (vaultEntry.extraChains?.length) {
+    for (const chain of vaultEntry.extraChains) {
+      if (!vault.chains.includes(chain)) {
+        await vault.addChain(chain)
+      }
+    }
+  }
+
   return { sdk, vault, vaultEntry }
 }

@@ -63,6 +63,7 @@ program
   .description('[Wallet] Show vault balances')
   .option('--chain <chain>', 'filter by chain')
   .option('--include-tokens', 'include token balances')
+  .option('--fiat', 'show USD values')
   .action(async (opts) => {
     const { balanceCommand } = await import('./commands/balance.js')
     await balanceCommand(opts, getFormat())
@@ -137,6 +138,17 @@ program
   .action(async () => {
     const { vaultInfoCommand } = await import('./commands/vault.js')
     await vaultInfoCommand(getFormat())
+  })
+
+program
+  .command('chains')
+  .description('[Vault Management] List, add, or remove chains')
+  .option('--add <chain>', 'add a chain (e.g., Arbitrum)')
+  .option('--remove <chain>', 'remove a chain')
+  .option('--add-all', 'enable all supported chains')
+  .action(async (opts) => {
+    const { manageChainsCommand } = await import('./commands/chains.js')
+    await manageChainsCommand(opts, getFormat())
   })
 
 function getFormat(): OutputFormat {

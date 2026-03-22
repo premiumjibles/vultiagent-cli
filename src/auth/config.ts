@@ -9,6 +9,7 @@ export interface VaultEntry {
   id: string
   name: string
   filePath: string
+  extraChains?: string[]
 }
 
 export interface VasigConfig {
