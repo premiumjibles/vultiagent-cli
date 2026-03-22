@@ -49,19 +49,40 @@ export async function getBalances(opts: BalanceOpts): Promise<BalanceResult[]> {
     const chains = opts.chain ? [opts.chain] : undefined
 
     if (opts.fiat) {
-      const balances = await vault.balancesWithPrices(chains, opts.includeTokens, 'usd')
-      return Object.values(balances).map((b) => {
-        const result: BalanceResult = {
-          chain: b.chainId,
-          symbol: b.symbol,
-          amount: b.formattedAmount ?? b.amount,
+      const chainsToFetch = chains ?? [...vault.chains]
+      const results: BalanceResult[] = []
+
+      for (const chain of chainsToFetch) {
+        try {
+          const balances = await vault.balancesWithPrices([chain], opts.includeTokens, 'usd')
+          for (const b of Object.values(balances)) {
+            const result: BalanceResult = {
+              chain: b.chainId,
+              symbol: b.symbol,
+              amount: b.formattedAmount ?? b.amount,
+            }
+            if (b.fiatValue != null) {
+              result.fiatValue = parseFloat(b.fiatValue.toFixed(2))
+              result.fiatCurrency = 'USD'
+            }
+            if (b.tokenId) result.contractAddress = b.tokenId
+            if (b.decimals != null) result.decimals = b.decimals
+            results.push(result)
+          }
+        } catch {
+          // Pricing failed for this chain — fall back to balances without fiat
+          const balances = await vault.balances([chain], opts.includeTokens)
+          for (const b of Object.values(balances)) {
+            results.push({
+              chain: b.chainId,
+              symbol: b.symbol,
+              amount: b.formattedAmount ?? b.amount,
+            })
+          }
         }
-        if (b.fiatValue != null) {
-          result.fiatValue = `$${b.fiatValue.toFixed(2)}`
-          result.fiatCurrency = 'USD'
-        }
-        return result
-      })
+      }
+
+      return results
     }
 
     if (opts.chain) {
@@ -77,11 +98,14 @@ export async function getBalances(opts: BalanceOpts): Promise<BalanceResult[]> {
           const tokenId = t.id ?? t.contractAddress ?? ''
           try {
             const tb = await vault.balance(opts.chain, tokenId)
-            results.push({
+            const tokenResult: BalanceResult = {
               chain: opts.chain,
               symbol: tb.symbol ?? t.symbol,
               amount: tb.formattedAmount ?? tb.amount,
-            })
+            }
+            if (t.contractAddress) tokenResult.contractAddress = t.contractAddress
+            if (t.decimals != null) tokenResult.decimals = t.decimals
+            results.push(tokenResult)
           } catch {
             // skip tokens that fail to fetch
           }

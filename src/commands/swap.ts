@@ -1,7 +1,7 @@
 import { Vultisig } from '@vultisig/sdk'
 import { createSdkWithVault } from '../lib/sdk.js'
 import { printResult } from '../lib/output.js'
-import { NetworkError, UsageError } from '../lib/errors.js'
+import { NetworkError, UsageError, NoRouteError, classifyError, VasigError } from '../lib/errors.js'
 import { signWithRetry } from '../lib/signing.js'
 import type { OutputFormat } from '../lib/output.js'
 import type { SwapQuoteResult, SwapResult } from '../types.js'
@@ -65,7 +65,7 @@ export async function getSwapQuote(opts: SwapOpts): Promise<SwapQuoteResult> {
       provider: quote.provider,
     }
     if (quote.estimatedOutputFiat != null) {
-      result.estimatedOutputFiat = `$${quote.estimatedOutputFiat.toFixed(2)}`
+      result.estimatedOutputFiat = parseFloat(quote.estimatedOutputFiat.toFixed(2))
     }
     if (quote.requiresApproval) {
       result.requiresApproval = true
@@ -101,7 +101,7 @@ export async function executeSwap(opts: SwapOpts, format: OutputFormat): Promise
     const quote = await vault.getSwapQuote(quoteRequest)
 
     if (!quote.estimatedOutputFiat && parseFloat(opts.amount) > 0) {
-      throw new UsageError('Quote output is near-zero — this route would result in fund loss. Try a different route.')
+      throw new NoRouteError('Quote output is near-zero — this route would result in fund loss. Try a different route.')
     }
 
     // Log quote summary before executing
@@ -115,7 +115,7 @@ export async function executeSwap(opts: SwapOpts, format: OutputFormat): Promise
       provider: quote.provider,
     }
     if (quote.estimatedOutputFiat != null) {
-      summary.estimatedOutputFiat = `$${quote.estimatedOutputFiat.toFixed(2)}`
+      summary.estimatedOutputFiat = parseFloat(quote.estimatedOutputFiat.toFixed(2))
     }
     if (format !== 'json') {
       printResult({ action: 'quote', ...summary }, format)
@@ -172,9 +172,11 @@ export async function executeSwap(opts: SwapOpts, format: OutputFormat): Promise
     if (approvalTxHash) result.approvalTxHash = approvalTxHash
     return result
   } catch (err: unknown) {
+    if (err instanceof VasigError) throw err
     if (err instanceof Error && (err.message.includes('network') || err.message.includes('timeout'))) {
       throw new NetworkError(err.message)
     }
+    if (err instanceof Error) throw classifyError(err)
     throw err
   } finally {
     if (typeof sdk.dispose === 'function') sdk.dispose()

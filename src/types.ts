@@ -2,14 +2,19 @@ export interface BalanceResult {
   chain: string
   symbol: string
   amount: string
-  fiatValue?: string
+  fiatValue?: number
   fiatCurrency?: string
+  contractAddress?: string
+  decimals?: number
 }
 
 export interface SendResult {
   txHash: string
   chain: string
   explorerUrl: string
+  amount: string
+  to: string
+  symbol: string
 }
 
 export interface SwapQuoteResult {
@@ -20,7 +25,8 @@ export interface SwapQuoteResult {
   inputAmount: string
   estimatedOutput: string
   provider: string
-  estimatedOutputFiat?: string
+  estimatedOutputFiat?: number
+  inputFiat?: number
   requiresApproval?: boolean
   warnings?: string[]
 }

@@ -5,9 +5,10 @@ const mockVault = vi.hoisted(() => ({
   name: 'TestVault',
   isEncrypted: false,
   address: vi.fn().mockResolvedValue('0xSenderAddress'),
-  balance: vi.fn().mockResolvedValue({ decimals: 18, symbol: 'ETH', chain: 'Ethereum' }),
+  balance: vi.fn().mockResolvedValue({ decimals: 18, symbol: 'ETH', chain: 'Ethereum', amount: '10000000000000000000', formattedAmount: '10.0' }),
   getMaxSendAmount: vi.fn().mockResolvedValue({ maxSendable: 1000000000000000000n }),
   prepareSendTx: vi.fn().mockResolvedValue({ coin: { chain: 'Ethereum' } }),
+  validateTransaction: vi.fn().mockResolvedValue(null),
   extractMessageHashes: vi.fn().mockResolvedValue(['0xhash1']),
   sign: vi.fn().mockResolvedValue({ signature: '0xsig', recovery: 0, format: 'ecdsa' }),
   broadcastTx: vi.fn().mockResolvedValue('0xtxhash123'),
@@ -53,6 +54,9 @@ describe('send command', () => {
 
     expect(result.txHash).toBe('0xtxhash123')
     expect(result.chain).toBe('Ethereum')
+    expect(result.amount).toBe('1.0')
+    expect(result.to).toBe('0xRecipient')
+    expect(result.symbol).toBe('ETH')
     expect(mockVault.prepareSendTx).toHaveBeenCalled()
     expect(mockVault.sign).toHaveBeenCalled()
     expect(mockVault.broadcastTx).toHaveBeenCalled()

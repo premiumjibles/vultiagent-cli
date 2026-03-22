@@ -1,7 +1,7 @@
 import { Vultisig } from '@vultisig/sdk'
 import { createSdkWithVault } from '../lib/sdk.js'
 import { printResult } from '../lib/output.js'
-import { NetworkError, UsageError } from '../lib/errors.js'
+import { NetworkError, UsageError, InsufficientBalanceError, classifyError, VasigError } from '../lib/errors.js'
 import { signWithRetry } from '../lib/signing.js'
 import type { OutputFormat } from '../lib/output.js'
 import type { SendResult } from '../types.js'
@@ -45,7 +45,7 @@ export async function executeSend(opts: SendOpts): Promise<SendResult> {
     }
 
     if (amount > BigInt(balance.amount)) {
-      throw new UsageError(
+      throw new InsufficientBalanceError(
         `Insufficient balance: you have ${balance.formattedAmount ?? balance.amount} ${balance.symbol}, tried to send ${opts.amount}`,
       )
     }
@@ -80,11 +80,17 @@ export async function executeSend(opts: SendOpts): Promise<SendResult> {
 
     const explorerUrl = Vultisig.getTxExplorerUrl(opts.chain, txHash)
 
-    return { txHash, chain: opts.chain, explorerUrl }
+    const displayAmount = opts.amount === 'max'
+      ? (balance.formattedAmount ?? balance.amount)
+      : opts.amount
+
+    return { txHash, chain: opts.chain, explorerUrl, amount: displayAmount, to: opts.to, symbol: balance.symbol }
   } catch (err: unknown) {
+    if (err instanceof VasigError) throw err
     if (err instanceof Error && (err.message.includes('network') || err.message.includes('timeout'))) {
       throw new NetworkError(err.message)
     }
+    if (err instanceof Error) throw classifyError(err)
     throw err
   } finally {
     if (typeof sdk.dispose === 'function') sdk.dispose()

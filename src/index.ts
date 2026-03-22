@@ -3,7 +3,7 @@ import { Command, CommanderError } from 'commander'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { VasigError, ExitCode } from './lib/errors.js'
+import { VasigError, ExitCode, classifyError } from './lib/errors.js'
 import { printError } from './lib/output.js'
 import type { OutputFormat } from './lib/output.js'
 
@@ -178,8 +178,9 @@ async function main() {
       process.exit(err.exitCode)
     }
     if (err instanceof Error && err.message !== '') {
-      printError(err, getFormat())
-      process.exit(ExitCode.USAGE)
+      const classified = classifyError(err)
+      printError(classified, getFormat())
+      process.exit(classified.exitCode)
     }
     process.exit(ExitCode.USAGE)
   }

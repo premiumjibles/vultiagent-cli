@@ -7,11 +7,15 @@ const mockVault = vi.hoisted(() => ({
   getSwapQuote: vi.fn().mockResolvedValue({
     fromCoin: { chain: 'Ethereum', ticker: 'ETH', decimals: 18 },
     toCoin: { chain: 'Bitcoin', ticker: 'BTC', decimals: 8 },
-    estimatedOutput: '0.05',
+    estimatedOutput: 5000000n,
+    estimatedOutputFiat: 2500.0,
     provider: 'thorchain',
+    warnings: [],
+    requiresApproval: false,
   }),
   getSupportedSwapChains: vi.fn().mockResolvedValue(['Ethereum', 'Bitcoin', 'THORChain']),
   isSwapSupported: vi.fn().mockResolvedValue(true),
+  validateTransaction: vi.fn().mockResolvedValue(null),
   prepareSwapTx: vi.fn().mockResolvedValue({
     keysignPayload: { coin: { chain: 'Ethereum' } },
     approvalPayload: null,
@@ -61,6 +65,7 @@ describe('swap commands', () => {
       expect(result.fromToken).toBe('ETH')
       expect(result.toToken).toBe('BTC')
       expect(result.estimatedOutput).toBe('0.05')
+      expect(result.estimatedOutputFiat).toBe(2500)
       expect(result.provider).toBe('thorchain')
     })
   })
