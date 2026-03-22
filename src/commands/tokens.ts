@@ -1,6 +1,7 @@
 import { createSdkWithVault } from '../lib/sdk.js'
 import { printResult } from '../lib/output.js'
 import { UsageError } from '../lib/errors.js'
+import { toToken } from '../lib/tokens.js'
 import type { OutputFormat } from '../lib/output.js'
 
 interface TokensOpts {
@@ -23,21 +24,11 @@ export async function tokensCommand(opts: TokensOpts, format: OutputFormat): Pro
         try {
           const discovered = await vault.discoverTokens(chain)
           for (const d of discovered) {
-            // discoverTokens returns { chain, contractAddress, ticker, decimals, logo }
-            // addToken expects { id, symbol, name, decimals, contractAddress, chainId }
-            const raw = d as Record<string, unknown>
-            const token = {
-              id: String(raw.contractAddress ?? raw.id ?? ''),
-              symbol: String(raw.ticker ?? raw.symbol ?? 'UNKNOWN'),
-              name: String(raw.ticker ?? raw.name ?? 'Unknown'),
-              decimals: Number(raw.decimals ?? 18),
-              contractAddress: String(raw.contractAddress ?? ''),
-              chainId: chain,
-            }
-            await vault.addToken(chain, token as any)
+            const token = toToken(d)
+            await vault.addToken(chain, token)
             allDiscovered.push({
               chain,
-              contractAddress: token.contractAddress,
+              contractAddress: token.contractAddress ?? '',
               symbol: token.symbol,
               decimals: token.decimals,
             })
@@ -67,7 +58,7 @@ export async function tokensCommand(opts: TokensOpts, format: OutputFormat): Pro
         contractAddress: opts.add,
         chainId: opts.chain,
       }
-      await vault.addToken(opts.chain, token as any)
+      await vault.addToken(opts.chain, token)
       const balance = await vault.balance(opts.chain, opts.add)
       printResult({
         action: 'added',
@@ -84,11 +75,10 @@ export async function tokensCommand(opts: TokensOpts, format: OutputFormat): Pro
     for (const chain of vault.chains) {
       const tokens = vault.getTokens(chain)
       for (const t of tokens) {
-        const raw = t as Record<string, unknown>
         tokenList.push({
           chain,
-          id: String(raw.id ?? raw.contractAddress ?? ''),
-          symbol: String(raw.symbol ?? raw.ticker ?? 'UNKNOWN'),
+          id: t.id ?? t.contractAddress ?? '',
+          symbol: t.symbol,
         })
       }
     }

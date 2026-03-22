@@ -4,7 +4,8 @@
   "description": "Agent-friendly Vultisig CLI with keyring auth",
   "type": "module",
   "bin": {
-    "vasig": "./dist/index.js"
+    "vasig": "./dist/index.js",
+    "vasig-dev": "./bin/vasig-dev.js"
   },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean",

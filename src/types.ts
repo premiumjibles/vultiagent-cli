@@ -20,6 +20,9 @@ export interface SwapQuoteResult {
   inputAmount: string
   estimatedOutput: string
   provider: string
+  estimatedOutputFiat?: string
+  requiresApproval?: boolean
+  warnings?: string[]
 }
 
 export interface SwapResult {

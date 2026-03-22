@@ -31,18 +31,9 @@ export async function manageChainsCommand(opts: ChainsOpts, format: OutputFormat
     const currentExtras = entry?.extraChains ?? []
 
     if (opts.addAll) {
-      const before = vault.chains.length
+      const originalChains = [...vault.chains]
       await vault.setChains([...SUPPORTED_CHAINS])
-      const added = SUPPORTED_CHAINS.length - before
-
-      // Persist all non-default chains as extras
-      const defaultChains = vault.chains.filter(
-        (c) => !currentExtras.includes(c) && !SUPPORTED_CHAINS.includes(c)
-      )
-      // Actually, just store all supported chains minus defaults from .vult
-      const vaultContent = (await import('node:fs/promises')).readFile(vaultEntry.filePath, 'utf-8')
-      // Simpler: store all chains that aren't in the original import
-      const originalChains = ['Bitcoin', 'Ethereum', 'THORChain', 'Solana', 'BSC'] // from vault import
+      const added = SUPPORTED_CHAINS.length - originalChains.length
       const newExtras = SUPPORTED_CHAINS.filter((c) => !originalChains.includes(c))
       await persistExtraChains(vaultEntry.id, newExtras as string[])
 

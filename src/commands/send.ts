@@ -2,6 +2,7 @@ import { Vultisig } from '@vultisig/sdk'
 import { createSdkWithVault } from '../lib/sdk.js'
 import { printResult } from '../lib/output.js'
 import { NetworkError } from '../lib/errors.js'
+import { signWithRetry } from '../lib/signing.js'
 import type { OutputFormat } from '../lib/output.js'
 import type { SendResult } from '../types.js'
 
@@ -51,8 +52,8 @@ export async function executeSend(opts: SendOpts): Promise<SendResult> {
     })
 
     const messageHashes = await vault.extractMessageHashes(payload)
-    const signature = await vault.sign(
-      { transaction: payload, chain: opts.chain, messageHashes },
+    const signature = await signWithRetry(() =>
+      vault.sign({ transaction: payload, chain: opts.chain, messageHashes }),
     )
     const txHash = await vault.broadcastTx({
       chain: opts.chain,

@@ -2,6 +2,7 @@ import { Vultisig } from '@vultisig/sdk'
 import { createSdkWithVault } from '../lib/sdk.js'
 import { printResult } from '../lib/output.js'
 import { NetworkError } from '../lib/errors.js'
+import { signWithRetry } from '../lib/signing.js'
 import type { OutputFormat } from '../lib/output.js'
 import type { SwapQuoteResult, SwapResult } from '../types.js'
 
@@ -32,6 +33,13 @@ function buildSwapQuoteParams(opts: SwapOpts) {
   }
 }
 
+function formatAmount(raw: bigint, decimals: number): string {
+  const s = raw.toString().padStart(decimals + 1, '0')
+  const whole = s.slice(0, s.length - decimals)
+  const frac = s.slice(s.length - decimals).replace(/0+$/, '')
+  return frac ? `${whole}.${frac}` : whole
+}
+
 export async function getSwapQuote(opts: SwapOpts): Promise<SwapQuoteResult> {
   const { sdk, vault } = await createSdkWithVault()
 
@@ -39,15 +47,25 @@ export async function getSwapQuote(opts: SwapOpts): Promise<SwapQuoteResult> {
     const { quoteRequest } = buildSwapQuoteParams(opts)
     const quote = await vault.getSwapQuote(quoteRequest)
 
-    return {
+    const result: SwapQuoteResult = {
       fromChain: quote.fromCoin.chain,
       fromToken: quote.fromCoin.ticker,
       toChain: quote.toCoin.chain,
       toToken: quote.toCoin.ticker,
       inputAmount: opts.amount,
-      estimatedOutput: String(quote.estimatedOutput),
+      estimatedOutput: formatAmount(quote.estimatedOutput, quote.toCoin.decimals),
       provider: quote.provider,
     }
+    if (quote.estimatedOutputFiat != null) {
+      result.estimatedOutputFiat = `$${quote.estimatedOutputFiat.toFixed(2)}`
+    }
+    if (quote.requiresApproval) {
+      result.requiresApproval = true
+    }
+    if (quote.warnings.length > 0) {
+      result.warnings = quote.warnings
+    }
+    return result
   } finally {
     if (typeof sdk.dispose === 'function') sdk.dispose()
   }
@@ -64,12 +82,27 @@ export async function getSupportedChains(): Promise<string[]> {
   }
 }
 
-export async function executeSwap(opts: SwapOpts): Promise<SwapResult> {
+export async function executeSwap(opts: SwapOpts, format: OutputFormat): Promise<SwapResult> {
   const { sdk, vault } = await createSdkWithVault()
 
   try {
     const { from, to, quoteRequest } = buildSwapQuoteParams(opts)
     const quote = await vault.getSwapQuote(quoteRequest)
+
+    // Log quote summary before executing
+    const summary: SwapQuoteResult = {
+      fromChain: quote.fromCoin.chain,
+      fromToken: quote.fromCoin.ticker,
+      toChain: quote.toCoin.chain,
+      toToken: quote.toCoin.ticker,
+      inputAmount: opts.amount,
+      estimatedOutput: formatAmount(quote.estimatedOutput, quote.toCoin.decimals),
+      provider: quote.provider,
+    }
+    if (quote.estimatedOutputFiat != null) {
+      summary.estimatedOutputFiat = `$${quote.estimatedOutputFiat.toFixed(2)}`
+    }
+    printResult({ action: 'quote', ...summary }, format)
 
     const { keysignPayload, approvalPayload } = await vault.prepareSwapTx({
       fromCoin: { chain: from.chain, token: from.token },
@@ -83,8 +116,8 @@ export async function executeSwap(opts: SwapOpts): Promise<SwapResult> {
 
     if (approvalPayload) {
       const approvalHashes = await vault.extractMessageHashes(approvalPayload)
-      const approvalSig = await vault.sign(
-        { transaction: approvalPayload, chain: from.chain, messageHashes: approvalHashes },
+      const approvalSig = await signWithRetry(() =>
+        vault.sign({ transaction: approvalPayload, chain: from.chain, messageHashes: approvalHashes }),
       )
       approvalTxHash = await vault.broadcastTx({
         chain: from.chain,
@@ -95,8 +128,8 @@ export async function executeSwap(opts: SwapOpts): Promise<SwapResult> {
     }
 
     const messageHashes = await vault.extractMessageHashes(keysignPayload)
-    const signature = await vault.sign(
-      { transaction: keysignPayload, chain: from.chain, messageHashes },
+    const signature = await signWithRetry(() =>
+      vault.sign({ transaction: keysignPayload, chain: from.chain, messageHashes }),
     )
 
     const txHash = await vault.broadcastTx({
@@ -107,7 +140,9 @@ export async function executeSwap(opts: SwapOpts): Promise<SwapResult> {
 
     const explorerUrl = Vultisig.getTxExplorerUrl(from.chain, txHash)
 
-    return { txHash, chain: from.chain, explorerUrl, approvalTxHash }
+    const result: SwapResult = { txHash, chain: from.chain, explorerUrl }
+    if (approvalTxHash) result.approvalTxHash = approvalTxHash
+    return result
   } catch (err: unknown) {
     if (err instanceof Error && (err.message.includes('network') || err.message.includes('timeout'))) {
       throw new NetworkError(err.message)
@@ -119,7 +154,7 @@ export async function executeSwap(opts: SwapOpts): Promise<SwapResult> {
 }
 
 export async function swapCommand(opts: SwapOpts, format: OutputFormat): Promise<void> {
-  const result = await executeSwap(opts)
+  const result = await executeSwap(opts, format)
   printResult(result, format)
 }
 
@@ -129,6 +164,6 @@ export async function swapQuoteCommand(opts: SwapOpts, format: OutputFormat): Pr
 }
 
 export async function swapChainsCommand(format: OutputFormat): Promise<void> {
-  const result = await getSupportedChains()
-  printResult(result, format)
+  const chains = await getSupportedChains()
+  printResult(chains.map((c) => ({ chain: c })), format)
 }

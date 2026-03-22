@@ -20,6 +20,7 @@ function formatTable(data: unknown): string {
   }
   if (typeof data === 'object') {
     return Object.entries(data as Record<string, unknown>)
+      .filter(([, v]) => v != null)
       .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : String(v)}`)
       .join('\n')
   }
