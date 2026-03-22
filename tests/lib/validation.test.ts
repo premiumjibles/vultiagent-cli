@@ -13,13 +13,9 @@ describe('resolveChain', () => {
     expect(resolveChain('bsc')).toBe('BSC')
   })
 
-  it('throws InvalidChainError with suggestion for single prefix match', () => {
-    expect(() => resolveChain('Ethe')).toThrow(InvalidChainError)
-    try {
-      resolveChain('Ethe')
-    } catch (e) {
-      expect((e as InvalidChainError).message).toContain('Did you mean: Ethereum')
-    }
+  it('auto-resolves unambiguous prefix match', () => {
+    expect(resolveChain('Ethe')).toBe('Ethereum')
+    expect(resolveChain('Arb')).toBe('Arbitrum')
   })
 
   it('throws InvalidChainError with suggestions for multiple prefix matches', () => {
@@ -37,11 +33,8 @@ describe('resolveChain', () => {
   })
 
   it('suggests close matches via Levenshtein for typos', () => {
-    try {
-      resolveChain('Etherem')
-    } catch (e) {
-      expect((e as InvalidChainError).message).toContain('Ethereum')
-    }
+    expect(() => resolveChain('Etherem')).toThrow(InvalidChainError)
+    expect(() => resolveChain('Etherem')).toThrow(/Ethereum/)
   })
 })
 

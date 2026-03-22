@@ -13,12 +13,7 @@ export function resolveChain(input: string): Chain {
   if (caseMatch) return caseMatch
 
   const prefixMatches = SUPPORTED_CHAINS.filter(c => c.toLowerCase().startsWith(inputLower))
-  if (prefixMatches.length === 1) {
-    throw new InvalidChainError(
-      `Unknown chain: "${input}". Did you mean: ${prefixMatches[0]}?`,
-      `Use --chain ${prefixMatches[0]}`
-    )
-  }
+  if (prefixMatches.length === 1) return prefixMatches[0]
 
   const suggestions = prefixMatches.length > 0
     ? prefixMatches
@@ -26,11 +21,11 @@ export function resolveChain(input: string): Chain {
 
   const hint = suggestions.length > 0
     ? `Did you mean: ${suggestions.join(', ')}?`
-    : 'Run "vultisig chains" to list all supported chains'
+    : 'Run "vasig chains" to list all supported chains'
 
   throw new InvalidChainError(
     `Unknown chain: "${input}". ${hint}`,
-    'Run "vultisig chains" to list all chains'
+    'Run "vasig chains" to list all chains'
   )
 }
 
