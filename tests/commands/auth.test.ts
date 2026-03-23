@@ -47,10 +47,9 @@ describe('auth commands', () => {
   })
 
   describe('authSetup', () => {
-    it('imports unencrypted vault and stores server password', async () => {
+    it('imports unencrypted vault with VAULT_PASSWORD env var (non-interactive)', async () => {
+      process.env.VAULT_PASSWORD = 'server-pass'
       mockedFs.readFile.mockResolvedValue('vault-file-content')
-      mockedInquirer.prompt
-        .mockResolvedValueOnce({ serverPassword: 'server-pass' })
 
       const result = await authSetup({ vaultFile: '/path/vault.vult' })
 
@@ -59,6 +58,16 @@ describe('auth commands', () => {
       expect(mockedKeytar.setPassword).toHaveBeenCalledWith(
         'vultisig', 'vault-123/server', 'server-pass'
       )
+      expect(mockedInquirer.prompt).not.toHaveBeenCalled()
+      delete process.env.VAULT_PASSWORD
+    })
+
+    it('throws in non-TTY without VAULT_PASSWORD', async () => {
+      delete process.env.VAULT_PASSWORD
+      mockedFs.readFile.mockResolvedValue('vault-file-content')
+
+      await expect(authSetup({ vaultFile: '/path/vault.vult' }))
+        .rejects.toThrow('No TTY available for password prompt')
     })
   })
 

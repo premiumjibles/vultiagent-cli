@@ -17,6 +17,16 @@ export interface SendResult {
   symbol: string
 }
 
+export interface SendDryRunResult {
+  dryRun: true
+  chain: string
+  to: string
+  amount: string
+  symbol: string
+  balance: string
+  warning?: string
+}
+
 export interface SwapQuoteResult {
   fromChain: string
   fromToken: string
@@ -29,6 +39,10 @@ export interface SwapQuoteResult {
   inputFiat?: number
   requiresApproval?: boolean
   warnings?: string[]
+}
+
+export interface SwapDryRunResult extends SwapQuoteResult {
+  dryRun: true
 }
 
 export interface SwapResult {

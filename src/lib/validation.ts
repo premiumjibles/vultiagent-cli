@@ -25,7 +25,10 @@ export function resolveChain(input: string): Chain {
 
   throw new InvalidChainError(
     `Unknown chain: "${input}". ${hint}`,
-    'Run "vasig chains" to list all chains'
+    'Run "vasig chains" to list all chains',
+    suggestions.length > 0
+      ? suggestions.map(s => `vasig balance --chain ${s}`)
+      : ['vasig chains'],
   )
 }
 
@@ -52,7 +55,31 @@ export function isEvmChain(chain: string): boolean {
   return EVM_CHAINS.includes(chain)
 }
 
-function findClosest(input: string, candidates: readonly string[], maxResults: number): string[] {
+interface ValidationResult {
+  isRisky: boolean
+  riskLevel?: string | null
+  description?: string
+  features: string[]
+}
+
+interface Validatable {
+  validateTransaction(payload: unknown): Promise<ValidationResult | null>
+}
+
+export async function assertNotRisky(vault: Validatable, payload: unknown, opts: { yes?: boolean }): Promise<void> {
+  const validation = await vault.validateTransaction(payload)
+  if (validation?.isRisky && !opts.yes) {
+    throw new UsageError(
+      `Transaction flagged as risky (${validation.riskLevel ?? 'unknown'}): ${validation.description ?? 'No details'}`,
+      `Details: ${validation.features.join(', ')}. Use --yes to override.`
+    )
+  }
+  if (validation?.isRisky) {
+    process.stderr.write(`⚠ Risk warning (${validation.riskLevel ?? 'unknown'}): ${validation.description ?? 'No details'}\n`)
+  }
+}
+
+export function findClosest(input: string, candidates: readonly string[], maxResults: number): string[] {
   const inputLower = input.toLowerCase()
   const scored = candidates
     .map(c => ({ chain: c, dist: levenshtein(inputLower, c.toLowerCase()) }))
@@ -61,7 +88,7 @@ function findClosest(input: string, candidates: readonly string[], maxResults: n
   return scored.slice(0, maxResults).map(s => s.chain)
 }
 
-function levenshtein(a: string, b: string): number {
+export function levenshtein(a: string, b: string): number {
   const m = a.length, n = b.length
   const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
     Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))

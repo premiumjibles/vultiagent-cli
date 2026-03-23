@@ -18,6 +18,7 @@ vi.mock('../../src/lib/sdk.js', () => ({
     vault: mockVault,
     vaultEntry: { id: 'vault-123', tokens: {} },
   })),
+  suppressConsoleWarn: vi.fn(async (fn: () => unknown) => fn()),
 }))
 
 vi.mock('../../src/auth/config.js', () => ({
@@ -57,6 +58,7 @@ describe('balance command', () => {
     const result = await getBalances({ chain: 'Ethereum' })
     expect(result).toHaveLength(1)
     expect(result[0].chain).toBe('Ethereum')
+    expect(result[0].decimals).toBe(18)
   })
 
   it('returns balances with fiat values', async () => {
@@ -95,16 +97,18 @@ describe('balance command', () => {
     expect(eth.fiatValue).toBe(2500)
     expect(eth.fiatCurrency).toBe('USD')
 
-    // SOL and PUMP should be present without fiat values
+    // SOL and PUMP should be present without fiat values but with decimals
     const sol = result.find((r) => r.symbol === 'SOL')!
     expect(sol.chain).toBe('Solana')
     expect(sol.amount).toBe('1.0')
     expect(sol.fiatValue).toBeUndefined()
+    expect(sol.decimals).toBe(9)
 
     const pump = result.find((r) => r.symbol === 'PUMP')!
     expect(pump.chain).toBe('Solana')
     expect(pump.amount).toBe('500.0')
     expect(pump.fiatValue).toBeUndefined()
+    expect(pump.decimals).toBe(6)
   })
 
   it('does not crash when all chains fail pricing', async () => {

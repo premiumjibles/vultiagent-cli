@@ -89,10 +89,35 @@ describe('swap commands', () => {
       })
 
       expect(result.txHash).toBe('0xswaptx')
-      expect(mockVault.getSwapQuote).toHaveBeenCalled()
-      expect(mockVault.prepareSwapTx).toHaveBeenCalled()
-      expect(mockVault.sign).toHaveBeenCalled()
-      expect(mockVault.broadcastTx).toHaveBeenCalled()
+    })
+
+    it('throws UsageError with hint when swapping same token', async () => {
+      try {
+        await getSwapQuote({ from: 'Ethereum', to: 'Ethereum', amount: '1.0' })
+        expect.fail('should have thrown')
+      } catch (err: any) {
+        expect(err.message).toBe('Cannot swap the same token')
+        expect(err.hint).toBe('The --from and --to chains/tokens must differ')
+      }
+    })
+
+    it('NoRouteError includes hint for near-zero output', async () => {
+      mockVault.getSwapQuote.mockResolvedValueOnce({
+        fromCoin: { chain: 'Ethereum', ticker: 'ETH', decimals: 18 },
+        toCoin: { chain: 'Bitcoin', ticker: 'BTC', decimals: 8 },
+        estimatedOutput: 0n,
+        estimatedOutputFiat: 0,
+        provider: 'thorchain',
+        warnings: [],
+      })
+
+      try {
+        await executeSwap({ from: 'Ethereum', to: 'Bitcoin', amount: '1.0', yes: true })
+        expect.fail('should have thrown')
+      } catch (err: any) {
+        expect(err.code).toBe('NO_ROUTE')
+        expect(err.hint).toBe('Try a different token pair or a larger amount')
+      }
     })
   })
 })

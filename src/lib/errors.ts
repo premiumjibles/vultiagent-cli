@@ -8,15 +8,28 @@ export enum ExitCode {
   EXTERNAL_SERVICE = 6,
 }
 
+export const EXIT_CODE_DESCRIPTIONS: Record<ExitCode, string> = {
+  [ExitCode.SUCCESS]: 'Success',
+  [ExitCode.USAGE]: 'Usage error (bad arguments, unknown command)',
+  [ExitCode.AUTH_REQUIRED]: 'Authentication required',
+  [ExitCode.NETWORK]: 'Network error (retryable)',
+  [ExitCode.INVALID_INPUT]: 'Invalid input (bad chain, address, amount)',
+  [ExitCode.RESOURCE_NOT_FOUND]: 'Resource not found (token, route)',
+  [ExitCode.EXTERNAL_SERVICE]: 'External service error (retryable)',
+}
+
 export abstract class VasigError extends Error {
   abstract readonly exitCode: ExitCode
   abstract readonly code: string
   readonly hint?: string
+  readonly suggestions?: string[]
+  readonly retryable: boolean = false
 
-  constructor(message: string, hint?: string) {
+  constructor(message: string, hint?: string, suggestions?: string[]) {
     super(message)
     this.name = this.constructor.name
     this.hint = hint
+    this.suggestions = suggestions
   }
 }
 
@@ -24,8 +37,8 @@ export class UsageError extends VasigError {
   readonly exitCode = ExitCode.USAGE
   readonly code = 'USAGE_ERROR'
 
-  constructor(message: string, hint?: string) {
-    super(message, hint)
+  constructor(message: string, hint?: string, suggestions?: string[]) {
+    super(message, hint, suggestions)
   }
 }
 
@@ -36,7 +49,8 @@ export class AuthRequiredError extends VasigError {
   constructor(message?: string) {
     super(
       message ?? 'Authentication required. Run vasig auth to set up credentials.',
-      'Run: vasig auth'
+      'Run: vasig auth',
+      ['vasig auth setup'],
     )
   }
 }
@@ -44,9 +58,10 @@ export class AuthRequiredError extends VasigError {
 export class NetworkError extends VasigError {
   readonly exitCode = ExitCode.NETWORK
   readonly code = 'NETWORK_ERROR'
+  override readonly retryable = true
 
-  constructor(message: string, hint?: string) {
-    super(message, hint)
+  constructor(message: string, hint?: string, suggestions?: string[]) {
+    super(message, hint, suggestions)
   }
 }
 
@@ -54,8 +69,8 @@ export class InvalidChainError extends VasigError {
   readonly exitCode = ExitCode.INVALID_INPUT
   readonly code = 'INVALID_CHAIN'
 
-  constructor(message: string, hint?: string) {
-    super(message, hint)
+  constructor(message: string, hint?: string, suggestions?: string[]) {
+    super(message, hint, suggestions)
   }
 }
 
@@ -63,8 +78,8 @@ export class InvalidAddressError extends VasigError {
   readonly exitCode = ExitCode.INVALID_INPUT
   readonly code = 'INVALID_ADDRESS'
 
-  constructor(message: string, hint?: string) {
-    super(message, hint)
+  constructor(message: string, hint?: string, suggestions?: string[]) {
+    super(message, hint, suggestions)
   }
 }
 
@@ -72,8 +87,8 @@ export class InsufficientBalanceError extends VasigError {
   readonly exitCode = ExitCode.INVALID_INPUT
   readonly code = 'INSUFFICIENT_BALANCE'
 
-  constructor(message: string, hint?: string) {
-    super(message, hint)
+  constructor(message: string, hint?: string, suggestions?: string[]) {
+    super(message, hint, suggestions)
   }
 }
 
@@ -81,8 +96,8 @@ export class NoRouteError extends VasigError {
   readonly exitCode = ExitCode.RESOURCE_NOT_FOUND
   readonly code = 'NO_ROUTE'
 
-  constructor(message: string, hint?: string) {
-    super(message, hint)
+  constructor(message: string, hint?: string, suggestions?: string[]) {
+    super(message, hint, suggestions)
   }
 }
 
@@ -90,17 +105,18 @@ export class TokenNotFoundError extends VasigError {
   readonly exitCode = ExitCode.RESOURCE_NOT_FOUND
   readonly code = 'TOKEN_NOT_FOUND'
 
-  constructor(message: string, hint?: string) {
-    super(message, hint)
+  constructor(message: string, hint?: string, suggestions?: string[]) {
+    super(message, hint, suggestions)
   }
 }
 
 export class PricingUnavailableError extends VasigError {
   readonly exitCode = ExitCode.EXTERNAL_SERVICE
   readonly code = 'PRICING_UNAVAILABLE'
+  override readonly retryable = true
 
-  constructor(message: string, hint?: string) {
-    super(message, hint)
+  constructor(message: string, hint?: string, suggestions?: string[]) {
+    super(message, hint, suggestions)
   }
 }
 
@@ -161,29 +177,38 @@ export function classifyError(err: Error): VasigError {
 
 export interface ErrorJson {
   ok: false
+  v: number
   error: {
     code: string
     message: string
     hint?: string
+    suggestions?: string[]
+    retryable: boolean
   }
 }
 
 export function toErrorJson(err: Error): ErrorJson {
   if (err instanceof VasigError) {
-    return {
+    const json: ErrorJson = {
       ok: false,
+      v: 1,
       error: {
         code: err.code,
         message: err.message,
         hint: err.hint,
+        retryable: err.retryable,
       },
     }
+    if (err.suggestions?.length) json.error.suggestions = err.suggestions
+    return json
   }
   return {
     ok: false,
+    v: 1,
     error: {
       code: 'UNKNOWN_ERROR',
       message: err.message,
+      retryable: false,
     },
   }
 }

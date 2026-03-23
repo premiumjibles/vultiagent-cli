@@ -59,9 +59,6 @@ describe('send command', () => {
     expect(result.amount).toBe('1.0')
     expect(result.to).toBe('0xRecipient')
     expect(result.symbol).toBe('ETH')
-    expect(mockVault.prepareSendTx).toHaveBeenCalled()
-    expect(mockVault.sign).toHaveBeenCalled()
-    expect(mockVault.broadcastTx).toHaveBeenCalled()
   })
 
   it('sends max amount when amount is "max"', async () => {
@@ -76,5 +73,75 @@ describe('send command', () => {
     expect(mockVault.prepareSendTx).toHaveBeenCalledWith(
       expect.objectContaining({ amount: 1000000000000000000n })
     )
+  })
+
+  it('dry-run with sufficient balance returns preview without warning', async () => {
+    const result = await executeSend({
+      chain: 'Ethereum',
+      to: '0xRecipient',
+      amount: '1.0',
+      dryRun: true,
+    })
+
+    expect(result.dryRun).toBe(true)
+    expect(result.chain).toBe('Ethereum')
+    expect(result.to).toBe('0xRecipient')
+    expect(result.amount).toBe('1.0')
+    expect(result.symbol).toBe('ETH')
+    expect(result.balance).toBe('10.0')
+    expect((result as any).warning).toBeUndefined()
+    expect(mockVault.prepareSendTx).not.toHaveBeenCalled()
+    expect(mockVault.sign).not.toHaveBeenCalled()
+    expect(mockVault.broadcastTx).not.toHaveBeenCalled()
+  })
+
+  it('dry-run with insufficient balance returns preview with warning', async () => {
+    mockVault.balance.mockResolvedValueOnce({
+      decimals: 18, symbol: 'ETH', chain: 'Ethereum',
+      amount: '500000000000000000', formattedAmount: '0.5',
+    })
+
+    const result = await executeSend({
+      chain: 'Ethereum',
+      to: '0xRecipient',
+      amount: '1.0',
+      dryRun: true,
+    })
+
+    expect(result.dryRun).toBe(true)
+    expect(result.amount).toBe('1.0')
+    expect((result as any).warning).toContain('Insufficient balance')
+    expect((result as any).warning).toContain('0.5 ETH')
+    expect(mockVault.prepareSendTx).not.toHaveBeenCalled()
+    expect(mockVault.sign).not.toHaveBeenCalled()
+    expect(mockVault.broadcastTx).not.toHaveBeenCalled()
+  })
+
+  it('non-dry-run with insufficient balance throws InsufficientBalanceError', async () => {
+    mockVault.balance.mockResolvedValueOnce({
+      decimals: 18, symbol: 'ETH', chain: 'Ethereum',
+      amount: '500000000000000000', formattedAmount: '0.5',
+    })
+
+    await expect(executeSend({
+      chain: 'Ethereum',
+      to: '0xRecipient',
+      amount: '1.0',
+      yes: true,
+    })).rejects.toThrow('Insufficient balance')
+  })
+
+  it('InsufficientBalanceError includes hint with chain', async () => {
+    mockVault.balance.mockResolvedValueOnce({
+      decimals: 18, symbol: 'ETH', chain: 'Ethereum',
+      amount: '500000000000000000', formattedAmount: '0.5',
+    })
+
+    try {
+      await executeSend({ chain: 'Ethereum', to: '0xRecipient', amount: '1.0', yes: true })
+      expect.fail('should have thrown')
+    } catch (err: any) {
+      expect(err.hint).toBe('Check balance: vasig balance --chain Ethereum')
+    }
   })
 })

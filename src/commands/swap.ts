@@ -2,16 +2,17 @@ import { Vultisig } from '@vultisig/sdk'
 import { withVault } from '../lib/sdk.js'
 import { printResult } from '../lib/output.js'
 import { UsageError, NoRouteError } from '../lib/errors.js'
-import { resolveChain, parseAmount } from '../lib/validation.js'
+import { resolveChain, parseAmount, assertNotRisky } from '../lib/validation.js'
 import { signWithRetry } from '../lib/signing.js'
 import type { OutputFormat } from '../lib/output.js'
-import type { SwapQuoteResult, SwapResult } from '../types.js'
+import type { SwapQuoteResult, SwapDryRunResult, SwapResult } from '../types.js'
 
 interface SwapOpts {
   from: string
   to: string
   amount: string
   yes?: boolean
+  dryRun?: boolean
 }
 
 function parseChainToken(input: string): { chain: string; token?: string } {
@@ -26,7 +27,7 @@ function buildSwapQuoteParams(opts: SwapOpts) {
 
   parseAmount(opts.amount)
   if (from.chain === to.chain && from.token === to.token) {
-    throw new UsageError('Cannot swap the same token')
+    throw new UsageError('Cannot swap the same token', 'The --from and --to chains/tokens must differ')
   }
 
   return {
@@ -80,7 +81,7 @@ export function mapQuoteResult(quote: QuoteLike, inputAmount: string): SwapQuote
   return result
 }
 
-export async function getSwapQuote(opts: SwapOpts): Promise<SwapQuoteResult> {
+export async function getSwapQuote(opts: SwapOpts, vaultId?: string): Promise<SwapQuoteResult> {
   return withVault(async ({ vault }) => {
     const { quoteRequest } = buildSwapQuoteParams(opts)
     const quote = await vault.getSwapQuote(quoteRequest)
@@ -90,27 +91,34 @@ export async function getSwapQuote(opts: SwapOpts): Promise<SwapQuoteResult> {
       result.warnings = [...(result.warnings ?? []), 'Quote output is near-zero — this route may result in fund loss.']
     }
     return result
-  })
+  }, vaultId)
 }
 
-export async function getSupportedChains(): Promise<string[]> {
+export async function getSupportedChains(vaultId?: string): Promise<string[]> {
   return withVault(async ({ vault }) => {
     const chains = await vault.getSupportedSwapChains()
     return [...chains]
-  })
+  }, vaultId)
 }
 
-export async function executeSwap(opts: SwapOpts, format: OutputFormat): Promise<SwapResult> {
+export async function executeSwap(opts: SwapOpts, format: OutputFormat, vaultId?: string): Promise<SwapResult | SwapDryRunResult> {
   return withVault(async ({ vault }) => {
     const { from, to, quoteRequest } = buildSwapQuoteParams(opts)
     const quote = await vault.getSwapQuote(quoteRequest)
 
     if ((quote.estimatedOutputFiat == null || quote.estimatedOutputFiat < 0.01) && parseFloat(opts.amount) > 0) {
-      throw new NoRouteError('Quote output is near-zero — this route would result in fund loss. Try a different route.')
+      throw new NoRouteError(
+        'Quote output is near-zero — this route would result in fund loss. Try a different route.',
+        'Try a different token pair or a larger amount',
+      )
     }
 
     // Log quote summary before executing
     const summary = mapQuoteResult(quote, opts.amount)
+
+    if (opts.dryRun) {
+      return { dryRun: true as const, ...summary }
+    }
     if (format !== 'json') {
       printResult({ action: 'quote', ...summary }, format)
     }
@@ -123,16 +131,7 @@ export async function executeSwap(opts: SwapOpts, format: OutputFormat): Promise
       autoApprove: false,
     })
 
-    const validation = await vault.validateTransaction(keysignPayload)
-    if (validation?.isRisky && !opts.yes) {
-      throw new UsageError(
-        `Swap flagged as risky (${validation.riskLevel}): ${validation.description}`,
-        `Details: ${validation.features.join(', ')}. Use --yes to override.`
-      )
-    }
-    if (validation?.isRisky) {
-      process.stderr.write(`⚠ Risk warning (${validation.riskLevel}): ${validation.description}\n`)
-    }
+    await assertNotRisky(vault, keysignPayload, opts)
 
     let approvalTxHash: string | undefined
 
@@ -164,22 +163,22 @@ export async function executeSwap(opts: SwapOpts, format: OutputFormat): Promise
 
     const result: SwapResult = { txHash, chain: from.chain, explorerUrl }
     if (approvalTxHash) result.approvalTxHash = approvalTxHash
-    return result
-  })
+    return result as SwapResult
+  }, vaultId)
 }
 
-export async function swapCommand(opts: SwapOpts, format: OutputFormat): Promise<void> {
-  const result = await executeSwap(opts, format)
+export async function swapCommand(opts: SwapOpts, format: OutputFormat, vaultId?: string): Promise<void> {
+  const result = await executeSwap(opts, format, vaultId)
   printResult(result, format)
 }
 
-export async function swapQuoteCommand(opts: SwapOpts, format: OutputFormat): Promise<void> {
-  const result = await getSwapQuote(opts)
+export async function swapQuoteCommand(opts: SwapOpts, format: OutputFormat, vaultId?: string): Promise<void> {
+  const result = await getSwapQuote(opts, vaultId)
   printResult(result, format)
 }
 
-export async function swapChainsCommand(format: OutputFormat): Promise<void> {
-  const chains = await getSupportedChains()
+export async function swapChainsCommand(format: OutputFormat, vaultId?: string): Promise<void> {
+  const chains = await getSupportedChains(vaultId)
   const unique = [...new Set(chains)]
   printResult(unique.map((c) => ({ chain: c })), format)
 }

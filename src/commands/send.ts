@@ -2,10 +2,10 @@ import { Vultisig } from '@vultisig/sdk'
 import { withVault } from '../lib/sdk.js'
 import { printResult } from '../lib/output.js'
 import { UsageError, InsufficientBalanceError } from '../lib/errors.js'
-import { resolveChain, parseAmount, isEvmChain } from '../lib/validation.js'
+import { resolveChain, parseAmount, isEvmChain, assertNotRisky } from '../lib/validation.js'
 import { signWithRetry } from '../lib/signing.js'
 import type { OutputFormat } from '../lib/output.js'
-import type { SendResult } from '../types.js'
+import type { SendResult, SendDryRunResult } from '../types.js'
 
 interface SendOpts {
   chain: string
@@ -14,9 +14,10 @@ interface SendOpts {
   token?: string
   memo?: string
   yes?: boolean
+  dryRun?: boolean
 }
 
-export async function executeSend(opts: SendOpts): Promise<SendResult> {
+export async function executeSend(opts: SendOpts, vaultId?: string): Promise<SendResult | SendDryRunResult> {
   const chain = resolveChain(opts.chain)
 
   if (opts.amount !== 'max') {
@@ -56,9 +57,30 @@ export async function executeSend(opts: SendOpts): Promise<SendResult> {
       amount = BigInt(whole || '0') * 10n ** BigInt(balance.decimals) + BigInt(paddedFrac || '0')
     }
 
-    if (amount > BigInt(balance.amount)) {
+    const hasInsufficientBalance = amount > BigInt(balance.amount)
+
+    if (opts.dryRun) {
+      const displayAmount = opts.amount === 'max'
+        ? (balance.formattedAmount ?? balance.amount)
+        : opts.amount
+      const result: SendDryRunResult = {
+        dryRun: true,
+        chain: chain,
+        to: opts.to,
+        amount: displayAmount,
+        symbol: balance.symbol,
+        balance: balance.formattedAmount ?? balance.amount,
+      }
+      if (hasInsufficientBalance) {
+        result.warning = `Insufficient balance: you have ${balance.formattedAmount ?? balance.amount} ${balance.symbol}`
+      }
+      return result
+    }
+
+    if (hasInsufficientBalance) {
       throw new InsufficientBalanceError(
         `Insufficient balance: you have ${balance.formattedAmount ?? balance.amount} ${balance.symbol}, tried to send ${opts.amount}`,
+        `Check balance: vasig balance --chain ${chain}`,
       )
     }
 
@@ -69,16 +91,7 @@ export async function executeSend(opts: SendOpts): Promise<SendResult> {
       memo: opts.memo,
     })
 
-    const validation = await vault.validateTransaction(payload)
-    if (validation?.isRisky && !opts.yes) {
-      throw new UsageError(
-        `Transaction flagged as risky (${validation.riskLevel}): ${validation.description}`,
-        `Details: ${validation.features.join(', ')}. Use --yes to override.`
-      )
-    }
-    if (validation?.isRisky) {
-      process.stderr.write(`⚠ Risk warning (${validation.riskLevel}): ${validation.description}\n`)
-    }
+    await assertNotRisky(vault, payload, opts)
 
     const messageHashes = await vault.extractMessageHashes(payload)
     const signature = await signWithRetry(() =>
@@ -97,10 +110,10 @@ export async function executeSend(opts: SendOpts): Promise<SendResult> {
       : opts.amount
 
     return { txHash, chain: chain, explorerUrl, amount: displayAmount, to: opts.to, symbol: balance.symbol }
-  })
+  }, vaultId)
 }
 
-export async function sendCommand(opts: SendOpts, format: OutputFormat): Promise<void> {
-  const result = await executeSend(opts)
+export async function sendCommand(opts: SendOpts, format: OutputFormat, vaultId?: string): Promise<void> {
+  const result = await executeSend(opts, vaultId)
   printResult(result, format)
 }

@@ -21,7 +21,7 @@ async function persistExtraChains(vaultId: string, extraChains: string[]): Promi
   }
 }
 
-export async function manageChainsCommand(opts: ChainsOpts, format: OutputFormat): Promise<void> {
+export async function manageChainsCommand(opts: ChainsOpts, format: OutputFormat, vaultId?: string): Promise<void> {
   return withVault(async ({ vault, vaultEntry }) => {
     // Get the default chains from the .vult file (before our extras)
     const config = await loadConfig()
@@ -92,5 +92,5 @@ export async function manageChainsCommand(opts: ChainsOpts, format: OutputFormat
       supported: [...SUPPORTED_CHAINS],
       supportedCount: SUPPORTED_CHAINS.length,
     }, format)
-  })
+  }, vaultId)
 }

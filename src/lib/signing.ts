@@ -1,5 +1,5 @@
-const MAX_SIGN_RETRIES = 1
-const RETRY_DELAY_MS = 15_000
+export const MAX_SIGN_RETRIES = 1
+export const RETRY_DELAY_MS = 15_000
 
 function isMpcTimeout(err: unknown): boolean {
   return err instanceof Error && err.message.toLowerCase().includes('timeout')

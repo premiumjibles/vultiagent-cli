@@ -13,6 +13,7 @@ import { UsageError } from '../lib/errors.js'
 
 interface AuthSetupOpts {
   vaultFile?: string
+  nonInteractive?: boolean
 }
 
 export async function authSetup(opts: AuthSetupOpts): Promise<{ vaultId: string; vaultName: string }> {
@@ -34,6 +35,11 @@ export async function authSetup(opts: AuthSetupOpts): Promise<{ vaultId: string;
 
     if (files.length === 1) {
       vaultFilePath = files[0]
+    } else if (!process.stdin.isTTY || opts.nonInteractive) {
+      throw new UsageError(
+        'Multiple vault files found but no TTY available for selection.',
+        'Use --vault-file <path> to specify which vault file to use'
+      )
     } else {
       const { selected } = await inquirer.prompt([
         {
@@ -57,28 +63,46 @@ export async function authSetup(opts: AuthSetupOpts): Promise<{ vaultId: string;
     let decryptPassword: string | undefined
 
     if (isEncrypted) {
-      const MAX_ATTEMPTS = 3
-      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        const { password } = await inquirer.prompt([
-          {
-            type: 'password',
-            name: 'password',
-            message: attempt === 1
-              ? 'Enter vault file password (the password you chose when exporting/backing up from the Vultisig app — this unlocks the .vult file):'
-              : `Wrong password. Try again (attempt ${attempt}/${MAX_ATTEMPTS}):`,
-            mask: '*',
-          },
-        ])
+      const envDecryptPw = process.env.VAULT_DECRYPT_PASSWORD
+      if (envDecryptPw) {
         try {
-          vault = await sdk.importVault(vaultContent, password)
-          decryptPassword = password
-          break
+          vault = await sdk.importVault(vaultContent, envDecryptPw)
+          decryptPassword = envDecryptPw
         } catch {
-          if (attempt === MAX_ATTEMPTS) {
-            throw new UsageError(
-              'Failed to decrypt vault after 3 attempts. Check your decryption password.',
-              'This is the password you set when exporting the vault from the Vultisig app.'
-            )
+          throw new UsageError(
+            'VAULT_DECRYPT_PASSWORD is set but failed to decrypt the vault.',
+            'Check that the password is correct'
+          )
+        }
+      } else if (!process.stdin.isTTY || opts.nonInteractive) {
+        throw new UsageError(
+          'Vault is encrypted but no TTY available for password prompt.',
+          'Set VAULT_DECRYPT_PASSWORD env var for non-interactive usage'
+        )
+      } else {
+        const MAX_ATTEMPTS = 3
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+          const { password } = await inquirer.prompt([
+            {
+              type: 'password',
+              name: 'password',
+              message: attempt === 1
+                ? 'Enter vault file password (the password you chose when exporting/backing up from the Vultisig app — this unlocks the .vult file):'
+                : `Wrong password. Try again (attempt ${attempt}/${MAX_ATTEMPTS}):`,
+              mask: '*',
+            },
+          ])
+          try {
+            vault = await sdk.importVault(vaultContent, password)
+            decryptPassword = password
+            break
+          } catch {
+            if (attempt === MAX_ATTEMPTS) {
+              throw new UsageError(
+                'Failed to decrypt vault after 3 attempts. Check your decryption password.',
+                'This is the password you set when exporting the vault from the Vultisig app.'
+              )
+            }
           }
         }
       }
@@ -89,14 +113,26 @@ export async function authSetup(opts: AuthSetupOpts): Promise<{ vaultId: string;
     // vault is guaranteed set — the loop either sets it or throws
     const v = vault!
 
-    const { serverPassword } = await inquirer.prompt([
-      {
-        type: 'password',
-        name: 'serverPassword',
-        message: 'Enter VultiServer password (your server signing password, used for 2-of-2 MPC signing with VultiServer):',
-        mask: '*',
-      },
-    ])
+    let serverPassword: string
+    const envServerPw = process.env.VAULT_PASSWORD
+    if (envServerPw) {
+      serverPassword = envServerPw
+    } else if (!process.stdin.isTTY || opts.nonInteractive) {
+      throw new UsageError(
+        'No TTY available for password prompt.',
+        'Set VAULT_PASSWORD env var for non-interactive usage'
+      )
+    } else {
+      const response = await inquirer.prompt([
+        {
+          type: 'password',
+          name: 'serverPassword',
+          message: 'Enter VultiServer password (your server signing password, used for 2-of-2 MPC signing with VultiServer):',
+          mask: '*',
+        },
+      ])
+      serverPassword = response.serverPassword
+    }
 
     await setServerPassword(v.id, serverPassword)
     if (isEncrypted && decryptPassword) {

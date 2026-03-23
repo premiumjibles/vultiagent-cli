@@ -9,7 +9,7 @@ export async function listVaults(): Promise<Array<{ id: string; name: string; fi
   return config.vaults.map((v) => ({ id: v.id, name: v.name, filePath: v.filePath }))
 }
 
-export async function getVaultInfo(): Promise<VaultInfoResult> {
+export async function getVaultInfo(vaultId?: string): Promise<VaultInfoResult> {
   return withVault(async ({ vault }) => ({
     id: vault.id,
     name: vault.name,
@@ -18,15 +18,15 @@ export async function getVaultInfo(): Promise<VaultInfoResult> {
     isEncrypted: vault.isEncrypted,
     threshold: vault.threshold,
     totalSigners: vault.totalSigners,
-  }))
+  }), vaultId)
 }
 
-export async function vaultCommand(opts: { list?: boolean }, format: OutputFormat): Promise<void> {
+export async function vaultCommand(opts: { list?: boolean }, format: OutputFormat, vaultId?: string): Promise<void> {
   if (opts.list) {
     const result = await listVaults()
     printResult(result, format)
     return
   }
-  const result = await getVaultInfo()
+  const result = await getVaultInfo(vaultId)
   printResult(result, format)
 }

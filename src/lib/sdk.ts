@@ -63,6 +63,16 @@ export async function createSdkWithVault(vaultId?: string) {
 
 export type VaultContext = Awaited<ReturnType<typeof createSdkWithVault>>
 
+export async function suppressConsoleWarn<T>(fn: () => Promise<T>): Promise<T> {
+  const origWarn = console.warn
+  console.warn = () => {}
+  try {
+    return await fn()
+  } finally {
+    console.warn = origWarn
+  }
+}
+
 export async function withVault<T>(
   fn: (ctx: VaultContext) => Promise<T>,
   vaultId?: string,

@@ -12,15 +12,22 @@ interface TokensOpts {
   add?: string
   remove?: string
   clear?: boolean
+  yes?: boolean
   symbol?: string
   decimals?: string
 }
 
-export async function tokensCommand(opts: TokensOpts, format: OutputFormat): Promise<void> {
+export async function tokensCommand(opts: TokensOpts, format: OutputFormat, vaultId?: string): Promise<void> {
   return withVault(async ({ vault, vaultEntry }) => {
     const chain = opts.chain ? resolveChain(opts.chain) : undefined
 
     if (opts.clear) {
+      if (!opts.yes) {
+        throw new UsageError(
+          `--clear will remove ${chain ? `all tokens on ${chain}` : 'all tracked tokens'}. Pass --yes to confirm.`,
+          'vasig tokens --clear --yes',
+        )
+      }
       await clearPersistedTokens(vaultEntry.id, chain ? String(chain) : undefined)
       printResult({
         action: 'cleared',
@@ -127,5 +134,5 @@ export async function tokensCommand(opts: TokensOpts, format: OutputFormat): Pro
       tokens: tokenList,
       count: tokenList.length,
     }, format)
-  })
+  }, vaultId)
 }
