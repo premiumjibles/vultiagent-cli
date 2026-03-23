@@ -1,5 +1,10 @@
 import { spawn, ChildProcess } from 'node:child_process'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { test, expect } from 'vitest'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const projectRoot = resolve(__dirname, '../..')
 
 function sendMessage(proc: ChildProcess, message: object): void {
   const json = JSON.stringify(message) + '\n'
@@ -31,7 +36,7 @@ function readMessage(proc: ChildProcess): Promise<Record<string, unknown>> {
 
 test('MCP server responds to initialize and tools/list over stdio', async () => {
   const proc = spawn('npx', ['tsx', 'src/mcp/start.ts'], {
-    cwd: '/home/sean/Repos/vultisig/vultiagent-cli',
+    cwd: projectRoot,
     stdio: ['pipe', 'pipe', 'pipe'],
   })
 
