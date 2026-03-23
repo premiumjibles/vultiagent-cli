@@ -3,7 +3,7 @@ import { getAddresses } from '../commands/addresses.js'
 import { getVaultInfo } from '../commands/vault.js'
 import { getSwapQuote, getSupportedChains, executeSwap } from '../commands/swap.js'
 import { executeSend } from '../commands/send.js'
-import { VasigError, classifyError } from '../lib/errors.js'
+import { VasigError, UsageError, classifyError } from '../lib/errors.js'
 
 interface ToolResult {
   content: [{ type: 'text'; text: string }]
@@ -89,8 +89,8 @@ export function getTools(): Record<string, ToolDef> {
         const addresses = await getAddresses()
         const chain = input.chain as string
         const match = addresses.find((a) => a.chain.toLowerCase() === chain.toLowerCase())
-        if (match) return match
-        return addresses.find((a) => a.chain === chain) ?? { chain, address: null, error: `Chain ${chain} not found in vault` }
+        if (!match) throw new UsageError(`Chain "${chain}" not found in vault`, 'Check vault_info for available chains')
+        return match
       }),
     },
 
