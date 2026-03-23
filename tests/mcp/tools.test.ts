@@ -286,5 +286,41 @@ describe('MCP tools', () => {
       expect(data.error).toBe('bad input')
       expect(data.hint).toBe('try again')
     })
+
+    it('classifies generic Error via classifyError', async () => {
+      mockVault.balances.mockRejectedValue(new Error('unsupported chain XYZ'))
+
+      const tools = getTools()
+      const result = await tools.get_balances.handler({})
+
+      expect(result.isError).toBe(true)
+      const data = JSON.parse(result.content[0].text)
+      expect(data.error).toBeTruthy()
+    })
+
+    it('handles non-Error throw with String() fallback', async () => {
+      mockVault.balances.mockRejectedValue('unexpected string error')
+
+      const tools = getTools()
+      const result = await tools.get_balances.handler({})
+
+      expect(result.isError).toBe(true)
+      const data = JSON.parse(result.content[0].text)
+      expect(data.error).toBeTruthy()
+    })
+  })
+
+  describe('get_address not-found', () => {
+    it('returns isError when chain is not in vault', async () => {
+      mockVault.address.mockResolvedValue('0xAbC123')
+
+      const tools = getTools()
+      const result = await tools.get_address.handler({ chain: 'Solana' })
+
+      expect(result.isError).toBe(true)
+      const data = JSON.parse(result.content[0].text)
+      expect(data.error).toBeTruthy()
+      expect(data.hint).toBeTruthy()
+    })
   })
 })
