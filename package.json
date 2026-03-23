@@ -18,23 +18,30 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "keywords": ["vultisig", "crypto", "cli", "agent", "mpc"],
+  "keywords": [
+    "vultisig",
+    "crypto",
+    "cli",
+    "agent",
+    "mpc"
+  ],
   "license": "MIT",
   "dependencies": {
-    "@vultisig/sdk": "^0.5.0",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "@vultisig/rujira": "^1.0.0",
+    "@vultisig/sdk": "^0.5.0",
+    "chalk": "^5.3.0",
     "commander": "^12.0.0",
-    "keytar": "^7.9.0",
     "inquirer": "^9.0.0",
-    "ora": "^8.0.0",
-    "chalk": "^5.3.0"
+    "keytar": "^7.9.0",
+    "ora": "^8.0.0"
   },
   "devDependencies": {
+    "@types/inquirer": "^9.0.0",
+    "@types/node": "^20.0.0",
     "tsup": "^8.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.4.0",
-    "vitest": "^2.0.0",
-    "@types/node": "^20.0.0",
-    "@types/inquirer": "^9.0.0"
+    "vitest": "^2.0.0"
   }
 }
