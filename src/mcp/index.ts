@@ -11,10 +11,10 @@ export function createMcpServer(): McpServer {
   const tools = getTools()
 
   for (const [name, tool] of Object.entries(tools)) {
-    server.tool(name, tool.description, tool.inputSchema.properties, async (params: Record<string, unknown>) => {
-      const result = await tool.handler(params)
-      return { ...result }
-    })
+    server.registerTool(name, {
+      description: tool.description,
+      inputSchema: tool.inputSchema,
+    }, async (args) => tool.handler(args))
   }
 
   return server

@@ -87,7 +87,7 @@ describe('MCP tools', () => {
       const tools = getTools()
       for (const [name, tool] of Object.entries(tools)) {
         expect(tool.description, `${name} missing description`).toBeTruthy()
-        expect(tool.inputSchema.type, `${name} inputSchema.type`).toBe('object')
+        expect(tool.inputSchema._zod, `${name} should be a Zod schema`).toBeDefined()
       }
     })
   })

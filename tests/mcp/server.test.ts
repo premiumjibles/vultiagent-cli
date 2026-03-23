@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const mockTool = vi.hoisted(() => vi.fn())
+const mockRegisterTool = vi.hoisted(() => vi.fn())
 const mockConnect = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 
 vi.mock('@modelcontextprotocol/sdk/server/mcp.js', () => ({
   McpServer: vi.fn().mockImplementation(() => ({
-    tool: mockTool,
+    registerTool: mockRegisterTool,
     connect: mockConnect,
   })),
 }))
@@ -36,37 +36,33 @@ describe('createMcpServer', () => {
     )
   })
 
-  it('registers all 8 tools via server.tool()', async () => {
+  it('registers all 8 tools via registerTool()', async () => {
     const { createMcpServer } = await import('../../src/mcp/index.js')
     createMcpServer()
-    expect(mockTool).toHaveBeenCalledTimes(8)
+    expect(mockRegisterTool).toHaveBeenCalledTimes(8)
   })
 
   it('registers tools with expected names', async () => {
     const { createMcpServer } = await import('../../src/mcp/index.js')
     createMcpServer()
 
-    const registeredNames = mockTool.mock.calls.map((call: unknown[]) => call[0])
+    const registeredNames = mockRegisterTool.mock.calls.map((call: unknown[]) => call[0])
     const expectedNames = [
-      'get_balances',
-      'get_portfolio',
-      'get_address',
-      'vault_info',
-      'supported_chains',
-      'swap_quote',
-      'send',
-      'swap',
+      'get_balances', 'get_portfolio', 'get_address',
+      'vault_info', 'supported_chains', 'swap_quote',
+      'send', 'swap',
     ]
     expect(registeredNames.sort()).toEqual(expectedNames.sort())
   })
 
-  it('passes description as second argument for each tool', async () => {
+  it('passes config with description for each tool', async () => {
     const { createMcpServer } = await import('../../src/mcp/index.js')
     createMcpServer()
 
-    for (const call of mockTool.mock.calls) {
-      expect(typeof call[1]).toBe('string')
-      expect((call[1] as string).length).toBeGreaterThan(0)
+    for (const call of mockRegisterTool.mock.calls) {
+      const config = call[1] as { description: string }
+      expect(typeof config.description).toBe('string')
+      expect(config.description.length).toBeGreaterThan(0)
     }
   })
 })
