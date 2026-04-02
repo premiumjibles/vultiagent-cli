@@ -447,4 +447,5 @@ async function main() {
   }
 }
 
-main()
+const isDirectRun = process.argv[1]?.includes('index')
+if (isDirectRun) main()
