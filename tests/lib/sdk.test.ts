@@ -52,7 +52,7 @@ describe('sdk helper', () => {
       return 'vault-file-content'
     })
 
-    const { sdk, vault } = await createSdkWithVault()
+    const { vault } = await createSdkWithVault()
     expect(vault.id).toBe('vault-123')
   })
 
