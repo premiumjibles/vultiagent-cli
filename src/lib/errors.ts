@@ -36,10 +36,6 @@ export abstract class VasigError extends Error {
 export class UsageError extends VasigError {
   readonly exitCode = ExitCode.USAGE
   readonly code = 'USAGE_ERROR'
-
-  constructor(message: string, hint?: string, suggestions?: string[]) {
-    super(message, hint, suggestions)
-  }
 }
 
 export class AuthRequiredError extends VasigError {
@@ -59,65 +55,37 @@ export class NetworkError extends VasigError {
   readonly exitCode = ExitCode.NETWORK
   readonly code = 'NETWORK_ERROR'
   override readonly retryable = true
-
-  constructor(message: string, hint?: string, suggestions?: string[]) {
-    super(message, hint, suggestions)
-  }
 }
 
 export class InvalidChainError extends VasigError {
   readonly exitCode = ExitCode.INVALID_INPUT
   readonly code = 'INVALID_CHAIN'
-
-  constructor(message: string, hint?: string, suggestions?: string[]) {
-    super(message, hint, suggestions)
-  }
 }
 
 export class InvalidAddressError extends VasigError {
   readonly exitCode = ExitCode.INVALID_INPUT
   readonly code = 'INVALID_ADDRESS'
-
-  constructor(message: string, hint?: string, suggestions?: string[]) {
-    super(message, hint, suggestions)
-  }
 }
 
 export class InsufficientBalanceError extends VasigError {
   readonly exitCode = ExitCode.INVALID_INPUT
   readonly code = 'INSUFFICIENT_BALANCE'
-
-  constructor(message: string, hint?: string, suggestions?: string[]) {
-    super(message, hint, suggestions)
-  }
 }
 
 export class NoRouteError extends VasigError {
   readonly exitCode = ExitCode.RESOURCE_NOT_FOUND
   readonly code = 'NO_ROUTE'
-
-  constructor(message: string, hint?: string, suggestions?: string[]) {
-    super(message, hint, suggestions)
-  }
 }
 
 export class TokenNotFoundError extends VasigError {
   readonly exitCode = ExitCode.RESOURCE_NOT_FOUND
   readonly code = 'TOKEN_NOT_FOUND'
-
-  constructor(message: string, hint?: string, suggestions?: string[]) {
-    super(message, hint, suggestions)
-  }
 }
 
 export class PricingUnavailableError extends VasigError {
   readonly exitCode = ExitCode.EXTERNAL_SERVICE
   readonly code = 'PRICING_UNAVAILABLE'
   override readonly retryable = true
-
-  constructor(message: string, hint?: string, suggestions?: string[]) {
-    super(message, hint, suggestions)
-  }
 }
 
 const SDK_NOISE_REPLACEMENTS: [RegExp, string][] = [
