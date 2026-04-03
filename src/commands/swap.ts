@@ -101,7 +101,7 @@ export async function getSupportedChains(vaultId?: string): Promise<string[]> {
   }, vaultId)
 }
 
-export async function executeSwap(opts: SwapOpts, format: OutputFormat, vaultId?: string): Promise<SwapResult | SwapDryRunResult> {
+export async function executeSwap(opts: SwapOpts, vaultId?: string): Promise<SwapResult | SwapDryRunResult> {
   return withVault(async ({ vault }) => {
     const { from, to, quoteRequest } = buildSwapQuoteParams(opts)
     const quote = await vault.getSwapQuote(quoteRequest)
@@ -118,9 +118,6 @@ export async function executeSwap(opts: SwapOpts, format: OutputFormat, vaultId?
 
     if (opts.dryRun) {
       return { dryRun: true as const, ...summary }
-    }
-    if (format !== 'json') {
-      printResult({ action: 'quote', ...summary }, format)
     }
 
     const { keysignPayload, approvalPayload } = await vault.prepareSwapTx({
@@ -168,7 +165,7 @@ export async function executeSwap(opts: SwapOpts, format: OutputFormat, vaultId?
 }
 
 export async function swapCommand(opts: SwapOpts, format: OutputFormat, vaultId?: string): Promise<void> {
-  const result = await executeSwap(opts, format, vaultId)
+  const result = await executeSwap(opts, vaultId)
   printResult(result, format)
 }
 

@@ -238,6 +238,31 @@ Examples:
     await tokensCommand(opts, getFormat(), getVaultId())
   })
 
+// --- Integration ---
+program
+  .command('mcp')
+  .description('[Integration] Start MCP server for AI agent integration')
+  .addHelpText('after', `
+The MCP server exposes vault operations as tools for AI agents (e.g. Claude Code).
+It communicates via JSON-RPC over stdin/stdout (stdio transport).
+
+Setup:
+  claude mcp add vultisig -- vasig mcp
+
+Tools provided:
+  get_balances      Get token balances
+  get_portfolio     Get balances with USD values
+  get_address       Get wallet address for a chain
+  vault_info        Show vault details
+  supported_chains  List swap-supported chains
+  swap_quote        Get a swap quote
+  send              Send tokens (with confirmation)
+  swap              Swap tokens (with confirmation)`)
+  .action(async () => {
+    const { startMcpServer } = await import('./mcp/index.js')
+    await startMcpServer()
+  })
+
 // --- Discovery ---
 
 const COMMAND_META: Record<string, {
