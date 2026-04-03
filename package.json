@@ -12,7 +12,8 @@
     "dev": "tsx src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "tsc --noEmit",
+    "lint": "tsc --noEmit && biome check",
+    "fix": "biome check --write --unsafe",
     "prepublishOnly": "npm run build"
   },
   "engines": {
@@ -37,6 +38,7 @@
     "ora": "^8.0.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.10",
     "@types/inquirer": "^9.0.0",
     "@types/node": "^20.0.0",
     "tsup": "^8.0.0",

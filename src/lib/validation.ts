@@ -36,7 +36,7 @@ export function parseAmount(input: string): number {
   if (input === 'max') return -1
 
   const num = Number(input)
-  if (isNaN(num) || num <= 0) {
+  if (Number.isNaN(num) || num <= 0) {
     throw new UsageError(
       `Invalid amount: "${input}". Amount must be a positive number.`,
       'Use "max" to send the full balance'

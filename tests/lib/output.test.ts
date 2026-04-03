@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { OutputFormat, formatOutput, printResult, printError, filterFields, setFields } from '../../src/lib/output.js'
-import { AuthRequiredError, toErrorJson } from '../../src/lib/errors.js'
+import { formatOutput, printResult, printError, filterFields, setFields } from '../../src/lib/output.js'
+import { AuthRequiredError, } from '../../src/lib/errors.js'
 
 describe('output formatting', () => {
   let stdoutSpy: ReturnType<typeof vi.spyOn>
