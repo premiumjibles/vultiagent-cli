@@ -126,17 +126,6 @@ export async function assertBroadcastConfirmed(
   }
 }
 
-/**
- * Truncate long addresses / ids for human-readable prompts without losing
- * the first/last few characters (which are what humans eyeball for typos).
- * Mirrors the truncateMiddle in the mobile client's chat UI for consistency
- * across agent surfaces.
- */
-export function truncateForPrompt(s: string, head = 6, tail = 4): string {
-  if (s.length <= head + tail + 1) return s
-  return `${s.slice(0, head)}...${s.slice(-tail)}`
-}
-
 export function findClosest(input: string, candidates: readonly string[], maxResults: number): string[] {
   const inputLower = input.toLowerCase()
   const scored = candidates

@@ -2,7 +2,7 @@ import { Vultisig } from '@vultisig/sdk'
 import { withVault } from '../lib/sdk.js'
 import { printResult } from '../lib/output.js'
 import { UsageError, InsufficientBalanceError } from '../lib/errors.js'
-import { resolveChain, parseAmount, isEvmChain, assertNotRisky, assertBroadcastConfirmed, truncateForPrompt } from '../lib/validation.js'
+import { resolveChain, parseAmount, isEvmChain, assertNotRisky, assertBroadcastConfirmed } from '../lib/validation.js'
 import { signWithRetry } from '../lib/signing.js'
 import type { OutputFormat } from '../lib/output.js'
 import type { SendResult, SendDryRunResult } from '../types.js'
@@ -94,13 +94,21 @@ export async function executeSend(opts: SendOpts, vaultId?: string): Promise<Sen
 
     // P0-7: require explicit intent before broadcast. Prompts on TTY,
     // hard-errors in non-interactive mode without --yes.
+    //
+    // Self-review follow-up: show the FULL destination. Truncating the
+    // middle is exactly wrong for address verification — that's the
+    // field the user typed (or pasted from LLM output) and needs to
+    // eyeball character-for-character before approving broadcast.
     const displayAmount = opts.amount === 'max'
       ? (balance.formattedAmount ?? balance.amount)
       : opts.amount
-    await assertBroadcastConfirmed(
-      opts,
-      `Send ${displayAmount} ${balance.symbol} on ${chain} to ${truncateForPrompt(opts.to)}?`,
-    )
+    const promptLines = [
+      `Broadcast SEND on ${chain}?`,
+      `  Amount: ${displayAmount} ${balance.symbol}`,
+      `  To:     ${opts.to}`,
+    ]
+    if (opts.memo) promptLines.push(`  Memo:   ${opts.memo}`)
+    await assertBroadcastConfirmed(opts, promptLines.join('\n'))
 
     await assertNotRisky(vault, payload, opts)
 

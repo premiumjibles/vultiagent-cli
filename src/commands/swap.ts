@@ -135,12 +135,28 @@ export async function executeSwap(opts: SwapOpts, format: OutputFormat, vaultId?
     // P0-7: require explicit intent before broadcasting either the
     // (optional) approval tx or the swap tx itself. Prompts on TTY,
     // hard-errors in non-interactive mode without --yes.
-    const fromLabel = `${opts.amount} ${from.token ?? from.chain}`
-    const toLabel = to.token ? `${to.token} on ${to.chain}` : to.chain
-    await assertBroadcastConfirmed(
-      opts,
-      `Swap ${fromLabel} on ${from.chain} to ${toLabel}?`,
-    )
+    //
+    // Self-review follow-up: surface ALL the numbers the user needs to
+    // verify (expected output, fiat estimate, approval requirement,
+    // provider). One vague "Swap X for Y?" prompt is not enough before
+    // mainnet broadcast.
+    const promptLines = [
+      `Broadcast SWAP?`,
+      `  From:     ${opts.amount} ${from.token ?? from.chain} (${from.chain})`,
+      `  To:       ${summary.toToken ?? to.chain} (${to.chain})`,
+      `  Output:   ~${summary.estimatedOutput} ${summary.toToken ?? ''}`.trim(),
+    ]
+    if (summary.estimatedOutputFiat != null) {
+      promptLines.push(`  Fiat est: ~$${summary.estimatedOutputFiat}`)
+    }
+    promptLines.push(`  Provider: ${summary.provider}`)
+    if (summary.requiresApproval) {
+      promptLines.push(`  NOTE:     Requires ERC-20 approval tx first (2 broadcasts total)`)
+    }
+    if (summary.warnings && summary.warnings.length > 0) {
+      for (const w of summary.warnings) promptLines.push(`  Warn:     ${w}`)
+    }
+    await assertBroadcastConfirmed(opts, promptLines.join('\n'))
 
     await assertNotRisky(vault, keysignPayload, opts)
 

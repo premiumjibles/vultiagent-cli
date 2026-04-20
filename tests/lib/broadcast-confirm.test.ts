@@ -16,7 +16,7 @@
  * inquirer — agent-driven invocations must not pay confirm latency.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { assertBroadcastConfirmed, truncateForPrompt } from '../../src/lib/validation.js'
+import { assertBroadcastConfirmed } from '../../src/lib/validation.js'
 import { UsageError } from '../../src/lib/errors.js'
 
 const promptMock = vi.fn()
@@ -103,16 +103,3 @@ describe('assertBroadcastConfirmed', () => {
   })
 })
 
-describe('truncateForPrompt', () => {
-  it('leaves short strings alone', () => {
-    expect(truncateForPrompt('0x1234')).toBe('0x1234')
-  })
-
-  it('truncates a long hex address with head + tail', () => {
-    expect(truncateForPrompt('0x9D7C407D02D8daEe3Cc3800d434E9eA594163003')).toBe('0x9D7C...3003')
-  })
-
-  it('respects custom head/tail', () => {
-    expect(truncateForPrompt('0x9D7C407D02D8daEe3Cc3800d434E9eA594163003', 4, 6)).toBe('0x9D...163003')
-  })
-})
