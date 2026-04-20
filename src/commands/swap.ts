@@ -2,7 +2,7 @@ import { Vultisig } from '@vultisig/sdk'
 import { withVault } from '../lib/sdk.js'
 import { printResult } from '../lib/output.js'
 import { UsageError, NoRouteError } from '../lib/errors.js'
-import { resolveChain, parseAmount, assertNotRisky } from '../lib/validation.js'
+import { resolveChain, parseAmount, assertNotRisky, assertBroadcastConfirmed } from '../lib/validation.js'
 import { signWithRetry } from '../lib/signing.js'
 import type { OutputFormat } from '../lib/output.js'
 import type { SwapQuoteResult, SwapDryRunResult, SwapResult } from '../types.js'
@@ -13,6 +13,7 @@ interface SwapOpts {
   amount: string
   yes?: boolean
   dryRun?: boolean
+  nonInteractive?: boolean
 }
 
 function parseChainToken(input: string): { chain: string; token?: string } {
@@ -127,6 +128,32 @@ export async function executeSwap(opts: SwapOpts, vaultId?: string): Promise<Swa
       swapQuote: quote,
       autoApprove: false,
     })
+
+    // P0-7: require explicit intent before broadcasting either the
+    // (optional) approval tx or the swap tx itself. Prompts on TTY,
+    // hard-errors in non-interactive mode without --yes.
+    //
+    // Self-review follow-up: surface ALL the numbers the user needs to
+    // verify (expected output, fiat estimate, approval requirement,
+    // provider). One vague "Swap X for Y?" prompt is not enough before
+    // mainnet broadcast.
+    const promptLines = [
+      `Broadcast SWAP?`,
+      `  From:     ${opts.amount} ${from.token ?? from.chain} (${from.chain})`,
+      `  To:       ${summary.toToken ?? to.chain} (${to.chain})`,
+      `  Output:   ~${summary.estimatedOutput} ${summary.toToken ?? ''}`.trim(),
+    ]
+    if (summary.estimatedOutputFiat != null) {
+      promptLines.push(`  Fiat est: ~$${summary.estimatedOutputFiat}`)
+    }
+    promptLines.push(`  Provider: ${summary.provider}`)
+    if (summary.requiresApproval) {
+      promptLines.push(`  NOTE:     Requires ERC-20 approval tx first (2 broadcasts total)`)
+    }
+    if (summary.warnings && summary.warnings.length > 0) {
+      for (const w of summary.warnings) promptLines.push(`  Warn:     ${w}`)
+    }
+    await assertBroadcastConfirmed(opts, promptLines.join('\n'))
 
     await assertNotRisky(vault, keysignPayload, opts)
 

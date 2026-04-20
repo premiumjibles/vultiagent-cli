@@ -79,6 +79,53 @@ export async function assertNotRisky(vault: Validatable, payload: unknown, opts:
   }
 }
 
+/**
+ * P0-7: gate broadcast behind an explicit human intent signal.
+ *
+ * Before this existed, `vasig send`/`vasig swap` with a valid payload +
+ * non-risky SDK validation would silently broadcast. In CI / pipes / agent-
+ * driven shells there's no human to stop a hallucinated recipient or a
+ * misplaced zero — the tx signs and lands on-chain.
+ *
+ * Matrix (after fix):
+ *                       | no flag    | --dry-run     | --yes
+ *   human TTY           | prompt     | preview only  | broadcast
+ *   non-TTY / --non-int | HARD ERROR | preview only  | broadcast
+ *
+ * `--dry-run` short-circuits in the command BEFORE this runs, so when this
+ * function is called the user is actually about to broadcast.
+ *
+ * `--yes` is the single automation escape hatch. It skips both this prompt
+ * and the risky-tx guard (`assertNotRisky`) — "I've checked, proceed."
+ *
+ * nonInteractive is threaded from the top-level `--non-interactive` flag so
+ * a user at a TTY can still force CI-like behavior for testing.
+ */
+export async function assertBroadcastConfirmed(
+  opts: { yes?: boolean; dryRun?: boolean; nonInteractive?: boolean },
+  prompt: string,
+): Promise<void> {
+  if (opts.yes || opts.dryRun) return
+
+  const nonInteractive = opts.nonInteractive || !process.stdin.isTTY
+  if (nonInteractive) {
+    throw new UsageError(
+      'Refusing to broadcast without explicit intent in non-interactive mode.',
+      'Pass --yes to confirm the broadcast, or --dry-run to preview without sending.'
+    )
+  }
+
+  // Import inquirer lazily — keeps startup cost off the --yes and --dry-run
+  // hot paths (which never reach this branch).
+  const inquirer = (await import('inquirer')).default
+  const { confirmed } = await inquirer.prompt<{ confirmed: boolean }>([
+    { type: 'confirm', name: 'confirmed', message: prompt, default: false },
+  ])
+  if (!confirmed) {
+    throw new UsageError('Cancelled.', 'Re-run with --yes to skip confirmation.')
+  }
+}
+
 export function findClosest(input: string, candidates: readonly string[], maxResults: number): string[] {
   const inputLower = input.toLowerCase()
   const scored = candidates

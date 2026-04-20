@@ -2,7 +2,7 @@ import { Vultisig } from '@vultisig/sdk'
 import { withVault } from '../lib/sdk.js'
 import { printResult } from '../lib/output.js'
 import { UsageError, InsufficientBalanceError } from '../lib/errors.js'
-import { resolveChain, parseAmount, isEvmChain, assertNotRisky } from '../lib/validation.js'
+import { resolveChain, parseAmount, isEvmChain, assertNotRisky, assertBroadcastConfirmed } from '../lib/validation.js'
 import { signWithRetry } from '../lib/signing.js'
 import type { OutputFormat } from '../lib/output.js'
 import type { SendResult, SendDryRunResult } from '../types.js'
@@ -15,6 +15,7 @@ interface SendOpts {
   memo?: string
   yes?: boolean
   dryRun?: boolean
+  nonInteractive?: boolean
 }
 
 export async function executeSend(opts: SendOpts, vaultId?: string): Promise<SendResult | SendDryRunResult> {
@@ -91,6 +92,24 @@ export async function executeSend(opts: SendOpts, vaultId?: string): Promise<Sen
       memo: opts.memo,
     })
 
+    // P0-7: require explicit intent before broadcast. Prompts on TTY,
+    // hard-errors in non-interactive mode without --yes.
+    //
+    // Self-review follow-up: show the FULL destination. Truncating the
+    // middle is exactly wrong for address verification — that's the
+    // field the user typed (or pasted from LLM output) and needs to
+    // eyeball character-for-character before approving broadcast.
+    const displayAmount = opts.amount === 'max'
+      ? (balance.formattedAmount ?? balance.amount)
+      : opts.amount
+    const promptLines = [
+      `Broadcast SEND on ${chain}?`,
+      `  Amount: ${displayAmount} ${balance.symbol}`,
+      `  To:     ${opts.to}`,
+    ]
+    if (opts.memo) promptLines.push(`  Memo:   ${opts.memo}`)
+    await assertBroadcastConfirmed(opts, promptLines.join('\n'))
+
     await assertNotRisky(vault, payload, opts)
 
     const messageHashes = await vault.extractMessageHashes(payload)
@@ -104,10 +123,6 @@ export async function executeSend(opts: SendOpts, vaultId?: string): Promise<Sen
     })
 
     const explorerUrl = Vultisig.getTxExplorerUrl(chain, txHash)
-
-    const displayAmount = opts.amount === 'max'
-      ? (balance.formattedAmount ?? balance.amount)
-      : opts.amount
 
     return { txHash, chain: chain, explorerUrl, amount: displayAmount, to: opts.to, symbol: balance.symbol }
   }, vaultId)
