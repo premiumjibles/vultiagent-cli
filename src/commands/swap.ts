@@ -2,7 +2,7 @@ import { Vultisig } from '@vultisig/sdk'
 import { withVault } from '../lib/sdk.js'
 import { printResult } from '../lib/output.js'
 import { UsageError, NoRouteError } from '../lib/errors.js'
-import { resolveChain, parseAmount, assertNotRisky } from '../lib/validation.js'
+import { resolveChain, parseAmount, assertNotRisky, assertBroadcastConfirmed } from '../lib/validation.js'
 import { signWithRetry } from '../lib/signing.js'
 import type { OutputFormat } from '../lib/output.js'
 import type { SwapQuoteResult, SwapDryRunResult, SwapResult } from '../types.js'
@@ -13,6 +13,7 @@ interface SwapOpts {
   amount: string
   yes?: boolean
   dryRun?: boolean
+  nonInteractive?: boolean
 }
 
 function parseChainToken(input: string): { chain: string; token?: string } {
@@ -130,6 +131,16 @@ export async function executeSwap(opts: SwapOpts, format: OutputFormat, vaultId?
       swapQuote: quote,
       autoApprove: false,
     })
+
+    // P0-7: require explicit intent before broadcasting either the
+    // (optional) approval tx or the swap tx itself. Prompts on TTY,
+    // hard-errors in non-interactive mode without --yes.
+    const fromLabel = `${opts.amount} ${from.token ?? from.chain}`
+    const toLabel = to.token ? `${to.token} on ${to.chain}` : to.chain
+    await assertBroadcastConfirmed(
+      opts,
+      `Swap ${fromLabel} on ${from.chain} to ${toLabel}?`,
+    )
 
     await assertNotRisky(vault, keysignPayload, opts)
 
