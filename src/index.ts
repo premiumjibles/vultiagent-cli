@@ -191,6 +191,63 @@ program
     await swapChainsCommand(getFormat(), getVaultId())
   })
 
+// --- Staking (cosmos-sdk staking + distribution module, read-only) ---
+const stakeGroup = program
+  .command('stake')
+  .description('[Staking] Cosmos-SDK staking module read commands (delegate/undelegate write commands ship in a follow-up PR)')
+
+stakeGroup
+  .command('delegations')
+  .description('List active delegations on a cosmos chain (validator addresses + balances)')
+  .requiredOption('-c, --chain <chain>', 'cosmos chain (Cosmos, Osmosis, Kujira, Terra, Akash, Noble, Dydx)')
+  .addHelpText('after', `
+Examples:
+  vasig stake delegations --chain Cosmos
+  vasig --output json stake delegations --chain Osmosis`)
+  .action(async (opts) => {
+    const { stakeDelegationsCommand } = await import('./commands/stake.js')
+    await stakeDelegationsCommand(opts, getFormat(), getVaultId())
+  })
+
+stakeGroup
+  .command('rewards')
+  .description('List pending staking rewards across validators')
+  .requiredOption('-c, --chain <chain>', 'cosmos chain')
+  .addHelpText('after', `
+Examples:
+  vasig stake rewards --chain Cosmos
+  vasig --output json stake rewards --chain Terra`)
+  .action(async (opts) => {
+    const { stakeRewardsCommand } = await import('./commands/stake.js')
+    await stakeRewardsCommand(opts, getFormat(), getVaultId())
+  })
+
+stakeGroup
+  .command('unbonding')
+  .description('List pending unbonding entries with completion times (~21d cosmos default)')
+  .requiredOption('-c, --chain <chain>', 'cosmos chain')
+  .addHelpText('after', `
+Examples:
+  vasig stake unbonding --chain Cosmos
+  vasig --output json stake unbonding --chain Kujira`)
+  .action(async (opts) => {
+    const { stakeUnbondingCommand } = await import('./commands/stake.js')
+    await stakeUnbondingCommand(opts, getFormat(), getVaultId())
+  })
+
+stakeGroup
+  .command('vesting')
+  .description('Show vesting account info if the address is a vesting account, else null')
+  .requiredOption('-c, --chain <chain>', 'cosmos chain')
+  .addHelpText('after', `
+Examples:
+  vasig stake vesting --chain Terra
+  vasig --output json stake vesting --chain Cosmos`)
+  .action(async (opts) => {
+    const { stakeVestingCommand } = await import('./commands/stake.js')
+    await stakeVestingCommand(opts, getFormat(), getVaultId())
+  })
+
 // --- Vault Management ---
 program
   .command('vault')
